@@ -114,6 +114,10 @@ static int socket_setup()
         LOG_ERR("getaddrinfo() failed. Err: %i", errno);
         return err;
     }
+    else
+    {
+        LOG_INF("getaddrinfo() successful.");
+    }
 
     ((struct sockaddr_in *)res->ai_addr)->sin_port = htons(CONFIG_CLOUD_PORT);
 
@@ -124,6 +128,10 @@ static int socket_setup()
         LOG_ERR("Failed to open socket!");
         err = -ECONNABORTED;
         goto clean_up;
+    }
+    else
+    {
+        LOG_INF("Socket created.");
     }
 
     struct timeval recv_timeout = {
@@ -136,6 +144,10 @@ static int socket_setup()
         LOG_ERR("Set receive timeout failed, error: %d, errno: %d", err, errno);
         goto clean_up;
     }
+    else
+    {
+        LOG_INF("Socket options set.");
+    }    
 
     struct timeval send_timeout = {
         .tv_sec = 5};
@@ -147,6 +159,10 @@ static int socket_setup()
         LOG_ERR("Set transmit timeout failed, error: %d, errno: %d", err, errno);
         goto clean_up;
     }
+    else
+    {
+        LOG_INF("Socket TX successful.");
+    } 
 
     /* Setup TLS socket options */
     err = tls_setup(fd);
@@ -155,6 +171,10 @@ static int socket_setup()
         LOG_ERR("Unable to setup TLS. Err: %i", err);
         goto clean_up;
     }
+    else
+    {
+        LOG_INF("TLS setup complete.");
+    } 
 
     /* Connect */
     err = connect(fd, res->ai_addr, sizeof(struct sockaddr_in));
@@ -283,6 +303,7 @@ int cloud_publish(struct device_data *data)
     /* Close connection */
     (void)close(fd);
 
+
     /* Free data */
     cJSON_free(msg);
 
@@ -351,7 +372,7 @@ int cloud_init(void (*callback)(struct device_data *data))
     /* Provision certificates before connecting to the LTE network */
     err = cert_provision();
     if (err)
-        LOG_ERR("Unable to provision certificate! Err: %i", err);
+       LOG_ERR("Unable to provision certificate! Err: %i", err);
 
     return 0;
 }
