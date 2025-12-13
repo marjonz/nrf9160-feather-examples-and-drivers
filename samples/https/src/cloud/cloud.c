@@ -306,7 +306,13 @@ int cloud_publish(struct device_data *data)
 
     ret = http_client_req(fd, &req, timeout, NULL);
     if (ret < 0)
+    {
         LOG_ERR("Unable to send data to cloud. Err: %i", ret);
+    }
+    else
+    {
+        LOG_INF("Data sent to cloud successfully");
+    }
 
     if (fd)
     {
@@ -317,9 +323,7 @@ int cloud_publish(struct device_data *data)
     /* Free data */
     cJSON_free(msg);
 
-    LOG_INF("Data sent to cloud");
-
-    return 0;
+    return ret;
 }
 
 /* Provision certificate to modem */

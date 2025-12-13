@@ -75,12 +75,11 @@ int main(void)
         return err;
     }
 
-    /* Start timer */
-    //k_timer_start(&timer, K_MINUTES(CONFIG_DEFAULT_DELAY), K_MINUTES(CONFIG_DEFAULT_DELAY));
-    k_timer_start(&timer, K_MINUTES(1), K_MINUTES(1));
-
     /* Wait a bit before attempting the connection to make sure the stack is done initializaing. */
     k_sleep(K_MSEC(20));
+
+    /* Start timer to periodically wake the device and publish data */
+    k_timer_start(&timer, K_MINUTES(CONFIG_DEFAULT_DELAY), K_MINUTES(CONFIG_DEFAULT_DELAY));
 
     /* Allow for instant publish */
     k_sem_give(&thread_sem);
@@ -92,6 +91,18 @@ int main(void)
         /* Publish and sleep .. */
         err = cloud_publish(&data);
         if (err < 0)
+        {
             LOG_ERR("Unable to publish. Err: %i", err);
+            // Stop the current timer and attemp to republich in 1 minute
+            k_timer_stop(&timer);
+            k_timer_start(&timer, K_MINUTES(1), K_MINUTES(1));
+        }
+        else
+        {
+            LOG_INF("Cloud publish successful.");
+            // Stop the current timer and attemp to republich in 1 minute
+            k_timer_stop(&timer);
+            k_timer_start(&timer, K_MINUTES(CONFIG_DEFAULT_DELAY), K_MINUTES(CONFIG_DEFAULT_DELAY));
+        }
     }
 }

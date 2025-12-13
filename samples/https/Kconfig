@@ -2,7 +2,7 @@ mainmenu "Application Configuration"
 
 config DEFAULT_DELAY
     int "Update interval (minutes)"
-    default 1440
+    default 2
 
 rsource "src/cloud/Kconfig"
 source "Kconfig.zephyr"
