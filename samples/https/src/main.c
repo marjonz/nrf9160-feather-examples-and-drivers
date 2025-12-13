@@ -65,7 +65,7 @@ int main(void)
     }
 
     /* Power saving is turned on */
-    lte_lc_psm_req(true);
+    lte_lc_psm_req(false);
 
     /* Connect */
     err = lte_lc_connect();
@@ -76,7 +76,11 @@ int main(void)
     }
 
     /* Start timer */
-    k_timer_start(&timer, K_MINUTES(CONFIG_DEFAULT_DELAY), K_MINUTES(CONFIG_DEFAULT_DELAY));
+    //k_timer_start(&timer, K_MINUTES(CONFIG_DEFAULT_DELAY), K_MINUTES(CONFIG_DEFAULT_DELAY));
+    k_timer_start(&timer, K_MINUTES(1), K_MINUTES(1));
+
+    /* Wait a bit before attempting the connection to make sure the stack is done initializaing. */
+    k_sleep(K_MSEC(20));
 
     /* Allow for instant publish */
     k_sem_give(&thread_sem);
