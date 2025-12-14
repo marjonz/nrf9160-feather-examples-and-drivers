@@ -25,7 +25,8 @@ static const char cert[] = {
 };
 
 /* Variables */
-const int32_t timeout = 3 * MSEC_PER_SEC;
+const int32_t timeout = 5 * MSEC_PER_SEC;
+#define SOCKET_TIMEOUT_SEC  8
 
 /* Callback */
 static void (*cloud_callback)(struct device_data *data);
@@ -135,7 +136,7 @@ static int socket_setup()
     }
 
     struct timeval recv_timeout = {
-        .tv_sec = 5};
+        .tv_sec = SOCKET_TIMEOUT_SEC};
 
     err = setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &recv_timeout, sizeof(recv_timeout));
     if (err != 0)
@@ -150,7 +151,7 @@ static int socket_setup()
     }    
 
     struct timeval send_timeout = {
-        .tv_sec = 5};
+        .tv_sec = SOCKET_TIMEOUT_SEC};
 
     err = setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &send_timeout, sizeof(send_timeout));
     if (err)
