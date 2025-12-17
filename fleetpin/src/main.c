@@ -1,0 +1,133 @@
+/*
+ * Copyright (c) 2020 Circuit Dojo LLC
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <zephyr/kernel.h>
+#include <zephyr/pm/device.h>
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(main);
+
+/* nRF Libraries */
+#include <modem/nrf_modem_lib.h>
+#include <modem/lte_lc.h>
+#include <modem/modem_info.h>
+
+/* Local */
+#include "cloud/cloud.h"
+
+#define CONFIG_RETRY_DELAY_MINUTES 1
+
+/* Timer */
+static void timeout_handler(struct k_timer *timer_id);
+K_TIMER_DEFINE(timer, timeout_handler, NULL);
+
+/* Thread control */
+K_SEM_DEFINE(thread_sem, 0, 1);
+K_SEM_DEFINE(lte_connected, 0, 1);
+
+/* Variables */
+static struct device_data data = {
+    .do_something = true,
+};
+
+void cloud_cb(struct device_data *p_data)
+{
+    LOG_INF("Cloud callback");
+
+    /* TODO: handle data here */
+}
+
+static void timeout_handler(struct k_timer *timer_id)
+{
+    LOG_INF("Main loop going back to sleep");
+    k_sem_give(&thread_sem);
+}
+
+static void lte_handler(const struct lte_lc_evt *evt)
+{
+    switch (evt->type) {
+    case LTE_LC_EVT_NW_REG_STATUS:
+        if ((evt->nw_reg_status == LTE_LC_NW_REG_REGISTERED_HOME) ||
+            (evt->nw_reg_status == LTE_LC_NW_REG_REGISTERED_ROAMING)) 
+        {
+            LOG_INF("LTE connected to network.");
+            k_sem_give(&lte_connected);
+        }
+        break;
+
+    default:
+        break;
+    }
+}
+
+int main(void)
+{
+    int err;
+
+    LOG_INF("HTTPS Sample. Board: %s", CONFIG_BOARD);
+
+    /* Register callback handler to handler LTE events */
+    lte_lc_register_handler(lte_handler);
+
+    /* Init modem lib */
+    err = nrf_modem_lib_init();
+    if (err < 0)
+    {
+        LOG_ERR("Failed to init modem lib. (err: %i)", err);
+        return err;
+    }
+
+    /* Cloud init */
+    err = cloud_init(cloud_cb);
+    if (err < 0)
+    {
+        LOG_ERR("Unable to set callback. Err: %i", err);
+        return err;
+    }
+
+    /* Power saving is turned on */
+    lte_lc_psm_req(true);
+
+    /* Connect */
+    LOG_INF("Connecting to LTE...");
+    err = lte_lc_connect();
+    /* Wait indefinitely (or add timeout?) */
+    k_sem_take(&lte_connected, K_FOREVER);
+    if (err < 0)
+    {
+        LOG_ERR("Failed to connect. Err: %i", err);
+        return err;
+    }
+
+    LOG_INF("Safe to use sockets now. LTE is connected.");
+
+    /* Start timer to periodically wake the device and publish data */
+    k_timer_start(&timer, K_MINUTES(CONFIG_DEFAULT_DELAY), K_MINUTES(CONFIG_DEFAULT_DELAY));
+
+    /* Allow for instant publish */
+    k_sem_give(&thread_sem);
+
+    while (1)
+    {
+        k_sem_take(&thread_sem, K_FOREVER);
+
+        /* Publish and sleep .. */
+        err = cloud_publish(&data);
+        if (err < 0)
+        {
+            LOG_ERR("Unable to publish. Err: %i", err);
+            // Stop the current timer and attempt to republish in CONFIG_RETRY_DELAY_MINUTES minutes
+            k_timer_stop(&timer);
+            k_timer_start(&timer, K_MINUTES(CONFIG_RETRY_DELAY_MINUTES), K_MINUTES(CONFIG_RETRY_DELAY_MINUTES));
+        }
+        else
+        {
+            LOG_INF("Cloud publish successful.");
+            // Stop the current timer and republish in the normal default delay interval
+            k_timer_stop(&timer);
+            k_timer_start(&timer, K_MINUTES(CONFIG_DEFAULT_DELAY), K_MINUTES(CONFIG_DEFAULT_DELAY));
+        }
+    }
+}
