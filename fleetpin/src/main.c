@@ -16,6 +16,7 @@ LOG_MODULE_REGISTER(main);
 
 /* Local */
 #include "cloud/cloud.h"
+#include "gnss/gnss.h"
 
 #define CONFIG_RETRY_DELAY_MINUTES 1
 
@@ -86,22 +87,19 @@ static void on_modem_lib_init(int ret, void *ctx)
 }
 #endif
 
-int main(void)
+/* Define the stack sizes for the threads */
+#define STACK_SIZE 512
+/* Define thread priorities (lower number = higher priority) */
+#define CLOUD_PRIORITY 7 
+#define GNSS_PRIORITY  8 
+
+/* Thread entry function for the first thread (e.g., blinking an LED) */
+void cloud_thread(void *p1, void *p2, void *p3) 
 {
-    int err;
 
-    LOG_INF("HTTPS Sample. Board: %s", CONFIG_BOARD);
-
-    /* Register callback handler to handler LTE events */
-    lte_lc_register_handler(lte_handler);
-
-    /* Init modem lib */
-    err = nrf_modem_lib_init();
-    if (err < 0)
-    {
-        LOG_ERR("Failed to init modem lib. (err: %i)", err);
-        return err;
-    }
+    ARG_UNUSED(p1);
+    ARG_UNUSED(p2);
+    ARG_UNUSED(p3);
 
     /* Cloud init */
     err = cloud_init(cloud_cb);
@@ -125,7 +123,18 @@ int main(void)
         return err;
     }
 
+    /* Wait for a while, because with IPv4v6 PDN the IPv6 activation takes a bit more time. */
+	k_sleep(K_SECONDS(1));
+
     LOG_INF("Safe to use sockets now. LTE is connected.");
+    
+    /* Initialize GNSS module*/
+    err = gnss_init();
+    if (err < 0)
+    {
+        LOG_ERR("Failed to initialize GNSS. Err: %i", err);
+        return err;
+    }
 
     /* Start timer to periodically wake the device and publish data */
     k_timer_start(&timer, K_MINUTES(CONFIG_DEFAULT_DELAY), K_MINUTES(CONFIG_DEFAULT_DELAY));
@@ -153,5 +162,46 @@ int main(void)
             k_timer_stop(&timer);
             k_timer_start(&timer, K_MINUTES(CONFIG_DEFAULT_DELAY), K_MINUTES(CONFIG_DEFAULT_DELAY));
         }
+    }
+}
+
+/* Thread entry function for the second thread */
+void gnss_thread(void *p1, void *p2, void *p3) 
+{
+    ARG_UNUSED(p1);
+    ARG_UNUSED(p2);
+    ARG_UNUSED(p3);
+
+    gnss_thread();
+}
+
+/* Define the threads using K_THREAD_DEFINE */
+K_THREAD_DEFINE(cloud_thread_id, STACK_SIZE, cloud_thread, NULL, NULL, NULL, CLOUD_PRIORITY, 0, 0);
+K_THREAD_DEFINE(gnss_thread_id, STACK_SIZE, gnss_thread, NULL, NULL, NULL, PRIORITY, 0, 0);
+
+
+int main(void)
+{
+    int err;
+
+    LOG_INF("HTTPS Sample. Board: %s", CONFIG_BOARD);
+
+    /* GNSS pre-init functions */
+    (void) gnss_pre_init();
+
+    /* Register callback handler to handler LTE events */
+    lte_lc_register_handler(lte_handler);
+
+    /* Init modem lib */
+    err = nrf_modem_lib_init();
+    if (err < 0)
+    {
+        LOG_ERR("Failed to init modem lib. (err: %i)", err);
+        return err;
+    }
+
+    /* The main thread can also perform work or go to sleep */
+    while (1) {
+        k_sleep(K_FOREVER); /* Sleep the main thread indefinitely */
     }
 }

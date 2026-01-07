@@ -6,3 +6,6 @@ config DEFAULT_DELAY
 
 rsource "src/cloud/Kconfig"
 source "Kconfig.zephyr"
+
+rsource "src/gnss/Kconfig"
+source "Kconfig.zephyr"

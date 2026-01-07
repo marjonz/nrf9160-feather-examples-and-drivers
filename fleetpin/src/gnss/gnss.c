@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
+#include "gnss.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -48,11 +50,11 @@ static double time_to_fix;
 static const char update_indicator[] = {'\\', '|', '/', '-'};
 
 static struct nrf_modem_gnss_pvt_data_frame last_pvt;
-static uint64_t fix_timestamp;
+static uint64_t fix_timestamp = 0uLL;
 static uint32_t time_blocked;
 
 /* Reference position. */
-static bool ref_used;
+static bool ref_used = false;
 static double ref_latitude;
 static double ref_longitude;
 
@@ -179,58 +181,6 @@ static void gnss_event_handler(int event)
 		break;
 	}
 }
-
-#if !defined(CONFIG_GNSS_SAMPLE_ASSISTANCE_NONE)
-#if defined(CONFIG_GNSS_SAMPLE_LTE_ON_DEMAND)
-K_SEM_DEFINE(lte_ready, 0, 1);
-
-static void lte_lc_event_handler(const struct lte_lc_evt *const evt)
-{
-	switch (evt->type) {
-	case LTE_LC_EVT_NW_REG_STATUS:
-		if ((evt->nw_reg_status == LTE_LC_NW_REG_REGISTERED_HOME) ||
-		    (evt->nw_reg_status == LTE_LC_NW_REG_REGISTERED_ROAMING)) {
-			LOG_INF("Connected to LTE network");
-			k_sem_give(&lte_ready);
-		}
-		break;
-
-	default:
-		break;
-	}
-}
-
-void lte_connect(void)
-{
-	int err;
-
-	LOG_INF("Connecting to LTE network");
-
-	err = lte_lc_func_mode_set(LTE_LC_FUNC_MODE_ACTIVATE_LTE);
-	if (err) {
-		LOG_ERR("Failed to activate LTE, error: %d", err);
-		return;
-	}
-
-	k_sem_take(&lte_ready, K_FOREVER);
-
-	/* Wait for a while, because with IPv4v6 PDN the IPv6 activation takes a bit more time. */
-	k_sleep(K_SECONDS(1));
-}
-
-void lte_disconnect(void)
-{
-	int err;
-
-	err = lte_lc_func_mode_set(LTE_LC_FUNC_MODE_DEACTIVATE_LTE);
-	if (err) {
-		LOG_ERR("Failed to deactivate LTE, error: %d", err);
-		return;
-	}
-
-	LOG_INF("LTE disconnected");
-}
-#endif /* CONFIG_GNSS_SAMPLE_LTE_ON_DEMAND */
 
 static const char *get_system_string(uint8_t system_id)
 {
@@ -438,41 +388,6 @@ static void ttff_test_start_work_fn(struct k_work *item)
 static void date_time_evt_handler(const struct date_time_evt *evt)
 {
 	k_sem_give(&time_sem);
-}
-
-static int modem_init(void)
-{
-	if (IS_ENABLED(CONFIG_DATE_TIME)) {
-		date_time_register_handler(date_time_evt_handler);
-	}
-
-#if defined(CONFIG_GNSS_SAMPLE_LTE_ON_DEMAND)
-	lte_lc_register_handler(lte_lc_event_handler);
-#elif !defined(CONFIG_GNSS_SAMPLE_ASSISTANCE_NONE)
-	lte_lc_psm_req(true);
-
-	LOG_INF("Connecting to LTE network");
-
-	if (lte_lc_connect() != 0) {
-		LOG_ERR("Failed to connect to LTE network");
-		return -1;
-	}
-
-	LOG_INF("Connected to LTE network");
-
-	if (IS_ENABLED(CONFIG_DATE_TIME)) {
-		LOG_INF("Waiting for current time");
-
-		/* Wait for an event from the Date Time library. */
-		k_sem_take(&time_sem, K_MINUTES(10));
-
-		if (!date_time_is_valid()) {
-			LOG_WRN("Failed to get current time, continuing anyway");
-		}
-	}
-#endif
-
-	return 0;
 }
 
 static int sample_init(void)
@@ -693,27 +608,41 @@ static void print_fix_data(struct nrf_modem_gnss_pvt_data_frame *pvt_data)
 	printf("TDOP:              %.01f\n", (double)pvt_data->tdop);
 }
 
-int main(void)
+int gnss_pre_init(void)
 {
-	int err;
-	uint8_t cnt = 0;
-	struct nrf_modem_gnss_nmea_data_frame *nmea_data;
-
-	LOG_INF("Starting GNSS sample");
 
     /* Initialize reference coordinates (if used). */
 	if (sizeof(CONFIG_GNSS_SAMPLE_REFERENCE_LATITUDE) > 1 &&
-	    sizeof(CONFIG_GNSS_SAMPLE_REFERENCE_LONGITUDE) > 1) {
+	    sizeof(CONFIG_GNSS_SAMPLE_REFERENCE_LONGITUDE) > 1) 
+	{
 		ref_used = true;
 		ref_latitude = atof(CONFIG_GNSS_SAMPLE_REFERENCE_LATITUDE);
 		ref_longitude = atof(CONFIG_GNSS_SAMPLE_REFERENCE_LONGITUDE);
 	}
 
-	if (modem_init() != 0) {
-		LOG_ERR("Failed to initialize modem");
-		return -1;
+	if (IS_ENABLED(CONFIG_DATE_TIME)) 
+	{
+		date_time_register_handler(date_time_evt_handler);
 	}
+	
+	return 0;
+}
 
+int gnss_init(void)
+{
+	if (IS_ENABLED(CONFIG_DATE_TIME)) 
+	{
+		LOG_INF("Waiting for current time");
+
+		/* Wait for an event from the Date Time library. */
+		k_sem_take(&time_sem, K_MINUTES(10));
+
+		if (!date_time_is_valid()) 
+		{
+			LOG_WRN("Failed to get current time, continuing anyway");
+		}
+	}
+	
 	if (sample_init() != 0) {
 		LOG_ERR("Failed to initialize sample");
 		return -1;
@@ -724,9 +653,22 @@ int main(void)
 		return -1;
 	}
 
+	LOG_INF("Starting GNSS sample");
+	return 0;
+}
+
+int gnss_thread(void)
+{
+	int err;
+	uint8_t cnt = 0;
+	struct nrf_modem_gnss_nmea_data_frame *nmea_data;
+
+	LOG_INF("Starting GNSS thread");
+
 	fix_timestamp = k_uptime_get();
 
 	for (;;) {
+		// NOTE: Can't poll this thread forever, need to check and exit.
 		(void)k_poll(events, 2, K_FOREVER);
 
 		if (events[0].state == K_POLL_STATE_SEM_AVAILABLE &&
