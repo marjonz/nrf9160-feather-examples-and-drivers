@@ -14,6 +14,9 @@ LOG_MODULE_REGISTER(main);
 #include <modem/lte_lc.h>
 #include <modem/modem_info.h>
 
+#include <modem/nrf_modem_lib.h>
+#include <nrf_modem_at.h>
+
 /* Local */
 #include "cloud/cloud.h"
 #include "gnss/gnss.h"
@@ -94,7 +97,7 @@ static void on_modem_lib_init(int ret, void *ctx)
 #define GNSS_PRIORITY  8 
 
 /* Thread entry function for the first thread (e.g., blinking an LED) */
-void cloud_thread(void *p1, void *p2, void *p3) 
+void cloud_thr(void *p1, void *p2, void *p3) 
 {
 
     ARG_UNUSED(p1);
@@ -102,11 +105,11 @@ void cloud_thread(void *p1, void *p2, void *p3)
     ARG_UNUSED(p3);
 
     /* Cloud init */
-    err = cloud_init(cloud_cb);
+    int err = cloud_init(cloud_cb);
     if (err < 0)
     {
         LOG_ERR("Unable to set callback. Err: %i", err);
-        return err;
+        return;
     }
 
     /* Power saving is turned on */
@@ -120,7 +123,7 @@ void cloud_thread(void *p1, void *p2, void *p3)
     if (err < 0)
     {
         LOG_ERR("Failed to connect. Err: %i", err);
-        return err;
+        return;
     }
 
     /* Wait for a while, because with IPv4v6 PDN the IPv6 activation takes a bit more time. */
@@ -133,7 +136,7 @@ void cloud_thread(void *p1, void *p2, void *p3)
     if (err < 0)
     {
         LOG_ERR("Failed to initialize GNSS. Err: %i", err);
-        return err;
+        return;
     }
 
     /* Start timer to periodically wake the device and publish data */
@@ -166,7 +169,7 @@ void cloud_thread(void *p1, void *p2, void *p3)
 }
 
 /* Thread entry function for the second thread */
-void gnss_thread(void *p1, void *p2, void *p3) 
+void gnss_thr(void *p1, void *p2, void *p3) 
 {
     ARG_UNUSED(p1);
     ARG_UNUSED(p2);
@@ -176,8 +179,8 @@ void gnss_thread(void *p1, void *p2, void *p3)
 }
 
 /* Define the threads using K_THREAD_DEFINE */
-K_THREAD_DEFINE(cloud_thread_id, STACK_SIZE, cloud_thread, NULL, NULL, NULL, CLOUD_PRIORITY, 0, 0);
-K_THREAD_DEFINE(gnss_thread_id, STACK_SIZE, gnss_thread, NULL, NULL, NULL, PRIORITY, 0, 0);
+K_THREAD_DEFINE(cloud_thread_id, STACK_SIZE, cloud_thr, NULL, NULL, NULL, CLOUD_PRIORITY, 0, 0);
+K_THREAD_DEFINE(gnss_thread_id, STACK_SIZE, gnss_thr, NULL, NULL, NULL, GNSS_PRIORITY, 0, 0);
 
 
 int main(void)

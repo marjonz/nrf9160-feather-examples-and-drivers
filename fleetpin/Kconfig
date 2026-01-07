@@ -4,8 +4,6 @@ config DEFAULT_DELAY
     int "Update interval (minutes)"
     default 2
 
-rsource "src/cloud/Kconfig"
-source "Kconfig.zephyr"
+rsource "src/cloud/Kconfig.cloud"
 
-rsource "src/gnss/Kconfig"
-source "Kconfig.zephyr"
+rsource "src/gnss/Kconfig.gnss"

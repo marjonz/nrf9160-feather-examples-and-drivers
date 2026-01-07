@@ -182,6 +182,7 @@ static void gnss_event_handler(int event)
 	}
 }
 
+#if !defined(CONFIG_GNSS_SAMPLE_ASSISTANCE_NONE)
 static const char *get_system_string(uint8_t system_id)
 {
 	switch (system_id) {
