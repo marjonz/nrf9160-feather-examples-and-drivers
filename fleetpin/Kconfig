@@ -4,6 +4,9 @@ config DEFAULT_DELAY
     int "Update interval (minutes)"
     default 2
 
+CONFIG_SPI=y
+CONFIG_SPI_NRFX=y
+
 rsource "src/cloud/Kconfig.cloud"
 
 rsource "src/gnss/Kconfig.gnss"
