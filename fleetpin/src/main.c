@@ -14,8 +14,12 @@ LOG_MODULE_REGISTER(main);
 #include <modem/lte_lc.h>
 #include <modem/modem_info.h>
 
+#include <modem/nrf_modem_lib.h>
+#include <nrf_modem_at.h>
+
 /* Local */
 #include "cloud/cloud.h"
+#include "gnss/gnss.h"
 
 #define CONFIG_RETRY_DELAY_MINUTES 1
 
@@ -62,29 +66,50 @@ static void lte_handler(const struct lte_lc_evt *evt)
     }
 }
 
-int main(void)
+/* Initialization of AUX pin */
+#if defined(CONFIG_BOARD_CIRCUITDOJO_FEATHER_NRF9151)
+#define AUXANTCFG_ENABLE "AT\%XANTCFG=1"
+
+NRF_MODEM_LIB_ON_INIT(aux_init_hook, on_modem_lib_init, NULL);
+
+static void on_modem_lib_init(int ret, void *ctx)
 {
-    int err;
+    ARG_UNUSED(ctx);
 
-    LOG_INF("HTTPS Sample. Board: %s", CONFIG_BOARD);
-
-    /* Register callback handler to handler LTE events */
-    lte_lc_register_handler(lte_handler);
-
-    /* Init modem lib */
-    err = nrf_modem_lib_init();
-    if (err < 0)
+    if (ret != 0)
     {
-        LOG_ERR("Failed to init modem lib. (err: %i)", err);
-        return err;
+        return;
     }
 
+    printk("*** Setting configuration: %s ***\n", AUXANTCFG_ENABLE);
+    int err = nrf_modem_at_printf("%s", AUXANTCFG_ENABLE);
+    if (err)
+    {
+        LOG_ERR("Failed to set configuration (err: %d)", err);
+    }
+}
+#endif
+
+/* Define the stack sizes for the threads */
+#define STACK_SIZE 512
+/* Define thread priorities (lower number = higher priority) */
+#define CLOUD_PRIORITY 7 
+#define GNSS_PRIORITY  8 
+
+/* Thread entry function for the first thread (e.g., blinking an LED) */
+void cloud_thr(void *p1, void *p2, void *p3) 
+{
+
+    ARG_UNUSED(p1);
+    ARG_UNUSED(p2);
+    ARG_UNUSED(p3);
+
     /* Cloud init */
-    err = cloud_init(cloud_cb);
+    int err = cloud_init(cloud_cb);
     if (err < 0)
     {
         LOG_ERR("Unable to set callback. Err: %i", err);
-        return err;
+        return;
     }
 
     /* Power saving is turned on */
@@ -98,10 +123,21 @@ int main(void)
     if (err < 0)
     {
         LOG_ERR("Failed to connect. Err: %i", err);
-        return err;
+        return;
     }
 
+    /* Wait for a while, because with IPv4v6 PDN the IPv6 activation takes a bit more time. */
+	k_sleep(K_SECONDS(1));
+
     LOG_INF("Safe to use sockets now. LTE is connected.");
+    
+    /* Initialize GNSS module*/
+    err = gnss_init();
+    if (err < 0)
+    {
+        LOG_ERR("Failed to initialize GNSS. Err: %i", err);
+        return;
+    }
 
     /* Start timer to periodically wake the device and publish data */
     k_timer_start(&timer, K_MINUTES(CONFIG_DEFAULT_DELAY), K_MINUTES(CONFIG_DEFAULT_DELAY));
@@ -129,5 +165,46 @@ int main(void)
             k_timer_stop(&timer);
             k_timer_start(&timer, K_MINUTES(CONFIG_DEFAULT_DELAY), K_MINUTES(CONFIG_DEFAULT_DELAY));
         }
+    }
+}
+
+/* Thread entry function for the second thread */
+void gnss_thr(void *p1, void *p2, void *p3) 
+{
+    ARG_UNUSED(p1);
+    ARG_UNUSED(p2);
+    ARG_UNUSED(p3);
+
+    gnss_thread();
+}
+
+/* Define the threads using K_THREAD_DEFINE */
+K_THREAD_DEFINE(cloud_thread_id, STACK_SIZE, cloud_thr, NULL, NULL, NULL, CLOUD_PRIORITY, 0, 0);
+K_THREAD_DEFINE(gnss_thread_id, STACK_SIZE, gnss_thr, NULL, NULL, NULL, GNSS_PRIORITY, 0, 0);
+
+
+int main(void)
+{
+    int err;
+
+    LOG_INF("HTTPS Sample. Board: %s", CONFIG_BOARD);
+
+    /* GNSS pre-init functions */
+    (void) gnss_pre_init();
+
+    /* Register callback handler to handler LTE events */
+    lte_lc_register_handler(lte_handler);
+
+    /* Init modem lib */
+    err = nrf_modem_lib_init();
+    if (err < 0)
+    {
+        LOG_ERR("Failed to init modem lib. (err: %i)", err);
+        return err;
+    }
+
+    /* The main thread can also perform work or go to sleep */
+    while (1) {
+        k_sleep(K_FOREVER); /* Sleep the main thread indefinitely */
     }
 }
