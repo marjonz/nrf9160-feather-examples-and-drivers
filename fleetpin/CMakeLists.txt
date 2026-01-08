@@ -8,6 +8,7 @@ project(fleetpin)
 target_sources(app PRIVATE src/main.c)
 target_sources(app PRIVATE src/cloud/cloud.c)
 target_sources(app PRIVATE src/gnss/gnss.c)
+target_sources(app PRIVATE src/epaper/epaper_driver.c)
 
 zephyr_library_sources_ifdef(CONFIG_GNSS_SAMPLE_ASSISTANCE_NRF_CLOUD ${NRF_DIR}/samples/cellular/gnss/src/assistance.c)
 zephyr_library_sources_ifdef(CONFIG_GNSS_SAMPLE_ASSISTANCE_SUPL ${NRF_DIR}/samples/cellular/gnss/src/assistance_supl.c)
