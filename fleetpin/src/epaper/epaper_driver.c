@@ -60,23 +60,22 @@ const unsigned char LUT_DATA_4Gray[112] =    //112bytes
     0x00u,	0x00u,	
 };	
 
-#define SPI_NODE DT_NODELABEL(spi2)
-static const struct device *spi_dev = NULL;
+#if 0
+#define SPI_NODE DT_NODELABEL(epaper_spi)
+static const struct device *spi_dev = DEVICE_DT_GET(DT_BUS(SPI_NODE));
 static struct spi_config spi_cfg = 
 {
     .frequency = 4000000,
-    .operation =
-        SPI_OP_MODE_MASTER |
-        SPI_WORD_SET(8) |
-        SPI_TRANSFER_MSB,
+    .operation = (SPI_OP_MODE_MASTER | SPI_WORD_SET(8) | SPI_TRANSFER_MSB),
     .slave = 0,
-    .cs = NULL, // Manual chip select control to be used
+    .cs = {{0}}, // Manual chip select control to be used
 };
 
 static const struct gpio_dt_spec chip_select_gpio = GPIO_DT_SPEC_GET(SPI_NODE, cs-gpios);
 static const struct gpio_dt_spec reset_gpio = GPIO_DT_SPEC_GET(SPI_NODE, rst-gpios);
 static const struct gpio_dt_spec data_cmd_gpio = GPIO_DT_SPEC_GET(SPI_NODE, data-cmd-gpios);
 static const struct gpio_dt_spec busy_gpio = GPIO_DT_SPEC_GET(SPI_NODE, busy-in-gpios);
+#endif
 #define TX_BUFFER_SIZE 120 
 #define RX_BUFFER_SIZE 20 
 static uint8_t tx_buf_data[TX_BUFFER_SIZE] = { 0 };
@@ -110,13 +109,13 @@ static void EPD_4in26_Reset(void)
 {
     //DEV_Digital_Write(EPD_RST_PIN, 1);
     gpio_pin_set_dt(&reset_gpio, 1);
-    DEV_Delay_ms(100);
+    k_msleep(100);
     //DEV_Digital_Write(EPD_RST_PIN, 0);
     gpio_pin_set_dt(&reset_gpio, 0);
-    DEV_Delay_ms(2);
+    k_msleep(2);
     //DEV_Digital_Write(EPD_RST_PIN, 1);
     gpio_pin_set_dt(&reset_gpio, 1);
-    DEV_Delay_ms(100);
+    k_msleep(100);
 }
 
 /******************************************************************************
@@ -150,7 +149,7 @@ function :	send command
 parameter:
      Reg : Command register
 ******************************************************************************/
-static void EPD_4in26_SendCommand(uint8 Reg)
+static void EPD_4in26_SendCommand(uint8_t Reg)
 {
     //DEV_Digital_Write(EPD_DC_PIN, 0);
     //DEV_Digital_Write(EPD_CS_PIN, 0);
@@ -167,7 +166,7 @@ function :	send data
 parameter:
     Data : Write data
 ******************************************************************************/
-static void EPD_4in26_SendData(uint8 Data)
+static void EPD_4in26_SendData(uint8_t Data)
 {
     //DEV_Digital_Write(EPD_DC_PIN, 1);
     //DEV_Digital_Write(EPD_CS_PIN, 0);
@@ -200,11 +199,11 @@ void EPD_4in26_ReadBusy(void)
     LOG_DBG("e-Paper busy");
 	while(1)
 	{	 //=1 BUSY (ACTIVE HIGH)
-		if(gpio_pin_get_dt(busy_gpio)==0) 
+		if(gpio_pin_get_dt(&busy_gpio)==0) 
 			break;
-		DEV_Delay_ms(20);
+		k_msleep(20);
 	}
-	DEV_Delay_ms(20);
+	k_msleep(20);
     LOG_DBG("e-Paper busy release\r\n");
 }
 
@@ -306,7 +305,7 @@ parameter:
 void EPD_4in26_Init(void)
 {
 	EPD_4in26_Reset();
-	DEV_Delay_ms(100);
+	k_msleep(100);
 
 	EPD_4in26_ReadBusy();   
 	EPD_4in26_SendCommand(0x12u);  //SWRESET
@@ -343,7 +342,7 @@ void EPD_4in26_Init(void)
 void EPD_4in26_Init_Fast(void)
 {
 	EPD_4in26_Reset();
-	DEV_Delay_ms(100);
+	k_msleep(100);
 
 	EPD_4in26_ReadBusy();   
 	EPD_4in26_SendCommand(0x12u);  //SWRESET
@@ -390,7 +389,7 @@ void EPD_4in26_Init_Fast(void)
 void EPD_4in26_Init_4GRAY(void)
 {
     EPD_4in26_Reset();
-	DEV_Delay_ms(100);
+	k_msleep(100);
 
 	EPD_4in26_ReadBusy();   
 	EPD_4in26_SendCommand(0x12u);  //SWRESET
@@ -662,5 +661,5 @@ void EPD_4in26_Sleep(void)
 {
 	EPD_4in26_SendCommand(0x10u); //enter deep sleep
 	EPD_4in26_SendData(0x03u); 
-	DEV_Delay_ms(100);
+	k_msleep(100);
 }
