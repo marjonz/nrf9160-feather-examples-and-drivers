@@ -1,11 +1,11 @@
 /*****************************************************************************
-* | File      	:   EPD_4in2b_V2.h
+* | File      	:   EPD_4in26.h
 * | Author      :   Waveshare team
-* | Function    :   4.2inch e-paper b&c
+* | Function    :   4.26inch e-paper test demo
 * | Info        :
 *----------------
 * |	This version:   V1.0
-* | Date        :   2020-11-25
+* | Date        :   2023-12-19
 * | Info        :
 * -----------------------------------------------------------------------------
 #
@@ -28,20 +28,26 @@
 # THE SOFTWARE.
 #
 ******************************************************************************
-from: https://github.com/waveshareteam/e-Paper/blob/master/STM32/STM32-F103ZET6/User/e-Paper/EPD_4in2b_V2_old.h
+from : https://github.com/waveshareteam/e-Paper/blob/master/RaspberryPi_JetsonNano/c/lib/e-Paper/EPD_4in26.h
 ******************************************************************************/
-#ifndef _EPAPER_DRIVER_H_
-#define _EPAPER_DRIVER_H_
+#ifndef __EPD_4in26_H_
+#define __EPD_4in26_H_
 
-#include "DEV_Config.h"
+#include <stdint.h>
 
 // Display resolution
-#define EPD_4IN2B_V2_WIDTH       400
-#define EPD_4IN2B_V2_HEIGHT      300
+#define EPD_4in26_WIDTH       (800u)
+#define EPD_4in26_HEIGHT      (480u)
 
-void EPD_4IN2B_V2_Init(void);
-void EPD_4IN2B_V2_Clear(void);
-void EPD_4IN2B_V2_Display(const UBYTE *blackimage, const UBYTE *ryimage);
-void EPD_4IN2B_V2_Sleep(void);
+void EPD_4in26_Init(void);
+void EPD_4in26_Init_Fast(void);
+void EPD_4in26_Init_4GRAY(void);
+void EPD_4in26_Clear(void);
+void EPD_4in26_Display(uint8_t *Image);
+void EPD_4in26_Display_Base(uint8_t *Image);
+void EPD_4in26_Display_Fast(uint8_t *Image);
+void EPD_4in26_Display_Part(uint8_t *Image, uint16_t x, uint16_t y, uint16_t w, uint16_t l);
+void EPD_4in26_4GrayDisplay(uint8_t *Image);
+void EPD_4in26_Sleep(void);
 
 #endif
