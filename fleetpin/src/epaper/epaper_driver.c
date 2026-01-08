@@ -34,8 +34,11 @@ from : https://github.com/waveshareteam/e-Paper/blob/master/RaspberryPi_JetsonNa
 
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/spi.h>
 #include <zephyr/logging/log.h>
+
 LOG_MODULE_REGISTER(epaper_driver);
 
 const unsigned char LUT_DATA_4Gray[112] =    //112bytes
@@ -60,22 +63,20 @@ const unsigned char LUT_DATA_4Gray[112] =    //112bytes
     0x00u,	0x00u,	
 };	
 
-#if 0
-#define SPI_NODE DT_NODELABEL(epaper_spi)
-static const struct device *spi_dev = DEVICE_DT_GET(DT_BUS(SPI_NODE));
-static struct spi_config spi_cfg = 
-{
-    .frequency = 4000000,
-    .operation = (SPI_OP_MODE_MASTER | SPI_WORD_SET(8) | SPI_TRANSFER_MSB),
-    .slave = 0,
-    .cs = {{0}}, // Manual chip select control to be used
-};
+#define SPI_EPAPER_NODE DT_NODELABEL(epaper_device)
+static const struct device *spi_dev = DEVICE_DT_GET(DT_BUS(SPI_EPAPER_NODE));
+static const struct spi_dt_spec spi = 
+    SPI_DT_SPEC_GET(
+        SPI_EPAPER_NODE, 
+        (SPI_OP_MODE_MASTER | SPI_WORD_SET(8) | SPI_TRANSFER_MSB | SPI_MODE_CPOL | SPI_MODE_CPHA), 
+        0
+    );
 
-static const struct gpio_dt_spec chip_select_gpio = GPIO_DT_SPEC_GET(SPI_NODE, cs-gpios);
-static const struct gpio_dt_spec reset_gpio = GPIO_DT_SPEC_GET(SPI_NODE, rst-gpios);
-static const struct gpio_dt_spec data_cmd_gpio = GPIO_DT_SPEC_GET(SPI_NODE, data-cmd-gpios);
-static const struct gpio_dt_spec busy_gpio = GPIO_DT_SPEC_GET(SPI_NODE, busy-in-gpios);
-#endif
+static const struct gpio_dt_spec chip_select_gpio = GPIO_DT_SPEC_GET(SPI_EPAPER_NODE, cs-gpios);
+static const struct gpio_dt_spec reset_gpio = GPIO_DT_SPEC_GET(SPI_EPAPER_NODE, rst-gpios);
+static const struct gpio_dt_spec data_cmd_gpio = GPIO_DT_SPEC_GET(SPI_EPAPER_NODE, dc-gpios);
+static const struct gpio_dt_spec busy_gpio = GPIO_DT_SPEC_GET(SPI_EPAPER_NODE, busy-gpios);
+
 #define TX_BUFFER_SIZE 120 
 #define RX_BUFFER_SIZE 20 
 static uint8_t tx_buf_data[TX_BUFFER_SIZE] = { 0 };
@@ -131,7 +132,7 @@ static void send_n_bytes(uint8_t *data, size_t len)
         memcpy(tx_buf_data, data, data_len);
         tx_buf.len = data_len;
         rx_buf.len = data_len;
-        int ret = spi_transceive(spi_dev, &spi_cfg, &tx, &rx);
+        int ret = spi_transceive_dt(&spi, &tx, &rx);
         if (ret != 0) 
         {
             LOG_DBG("SPI command transfer failed: %d", ret);
@@ -304,6 +305,25 @@ parameter:
 ******************************************************************************/
 void EPD_4in26_Init(void)
 {
+    if (!spi_is_ready_dt(&spi)) 
+    {
+        LOG_ERR("EPAPER SPI not ready");
+        return;
+    }
+
+    gpio_pin_configure_dt(&chip_select_gpio, GPIO_OUTPUT_INACTIVE);
+    gpio_pin_set_dt(&chip_select_gpio, 1);
+
+    if (!device_is_ready(chip_select_gpio.port)) 
+    {
+        LOG_ERR("EPAPER CS GPIO not ready");
+        return;
+    }
+    
+    gpio_pin_configure_dt(&reset_gpio, GPIO_OUTPUT_INACTIVE);
+    gpio_pin_configure_dt(&data_cmd_gpio, GPIO_OUTPUT_INACTIVE);
+    gpio_pin_configure_dt(&busy_gpio, GPIO_INPUT);
+
 	EPD_4in26_Reset();
 	k_msleep(100);
 
