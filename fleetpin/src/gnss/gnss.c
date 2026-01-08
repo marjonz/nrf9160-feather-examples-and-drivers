@@ -660,7 +660,6 @@ int gnss_init(void)
 
 int gnss_thread(void)
 {
-	int err;
 	uint8_t cnt = 0;
 	struct nrf_modem_gnss_nmea_data_frame *nmea_data;
 
