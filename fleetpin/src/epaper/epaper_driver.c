@@ -63,19 +63,22 @@ const unsigned char LUT_DATA_4Gray[112] =    //112bytes
     0x00u,	0x00u,	
 };	
 
-#define SPI_EPAPER_NODE DT_NODELABEL(epaper_device)
-static const struct device *spi_dev = DEVICE_DT_GET(DT_BUS(SPI_EPAPER_NODE));
+#define SPI_MASTER_NODE_ID DT_NODELABEL(epaper_device)
+static const struct device *spi_dev = DEVICE_DT_GET(DT_BUS(SPI_MASTER_NODE_ID));
 static const struct spi_dt_spec spi = 
     SPI_DT_SPEC_GET(
-        SPI_EPAPER_NODE, 
+        SPI_MASTER_NODE_ID, 
         (SPI_OP_MODE_MASTER | SPI_WORD_SET(8) | SPI_TRANSFER_MSB | SPI_MODE_CPOL | SPI_MODE_CPHA), 
         0
     );
 
-static const struct gpio_dt_spec chip_select_gpio = GPIO_DT_SPEC_GET(SPI_EPAPER_NODE, cs-gpios);
-static const struct gpio_dt_spec reset_gpio = GPIO_DT_SPEC_GET(SPI_EPAPER_NODE, rst-gpios);
-static const struct gpio_dt_spec data_cmd_gpio = GPIO_DT_SPEC_GET(SPI_EPAPER_NODE, dc-gpios);
-static const struct gpio_dt_spec busy_gpio = GPIO_DT_SPEC_GET(SPI_EPAPER_NODE, busy-gpios);
+#if 0
+#define SPI_EPAPER_NODE_ID DT_NODELABEL(epaper_device)
+static const struct gpio_dt_spec chip_select_gpio = GPIO_DT_SPEC_GET(SPI_EPAPER_NODE_ID, cs_gpios);
+static const struct gpio_dt_spec reset_gpio = GPIO_DT_SPEC_GET(SPI_EPAPER_NODE_ID, rst_gpios);
+static const struct gpio_dt_spec data_cmd_gpio = GPIO_DT_SPEC_GET(SPI_EPAPER_NODE_ID, data_command_gpios);
+static const struct gpio_dt_spec busy_gpio = GPIO_DT_SPEC_GET(SPI_EPAPER_NODE_ID, busy_gpios);
+#endif
 
 #define TX_BUFFER_SIZE 120 
 #define RX_BUFFER_SIZE 20 
@@ -108,14 +111,11 @@ parameter:
 ******************************************************************************/
 static void EPD_4in26_Reset(void)
 {
-    //DEV_Digital_Write(EPD_RST_PIN, 1);
-    gpio_pin_set_dt(&reset_gpio, 1);
-    k_msleep(100);
-    //DEV_Digital_Write(EPD_RST_PIN, 0);
-    gpio_pin_set_dt(&reset_gpio, 0);
-    k_msleep(2);
-    //DEV_Digital_Write(EPD_RST_PIN, 1);
-    gpio_pin_set_dt(&reset_gpio, 1);
+    // gpio_pin_set_dt(&reset_gpio, 1);
+    // k_msleep(100);
+    // gpio_pin_set_dt(&reset_gpio, 0);
+    // k_msleep(2);
+    // gpio_pin_set_dt(&reset_gpio, 1);
     k_msleep(100);
 }
 
@@ -127,7 +127,7 @@ static void send_n_bytes(uint8_t *data, size_t len)
     if (spi_dev != NULL) 
     {
         memset(tx_buf_data, 0, sizeof(tx_buf_data));
-        memset(rx_buf_data, 0, sizeof(tx_buf_data));
+        memset(rx_buf_data, 0, sizeof(rx_buf_data));
         size_t data_len = len < TX_BUFFER_SIZE ? len : sizeof(tx_buf_data);
         memcpy(tx_buf_data, data, data_len);
         tx_buf.len = data_len;
@@ -152,14 +152,10 @@ parameter:
 ******************************************************************************/
 static void EPD_4in26_SendCommand(uint8_t Reg)
 {
-    //DEV_Digital_Write(EPD_DC_PIN, 0);
-    //DEV_Digital_Write(EPD_CS_PIN, 0);
-    //DEV_SPI_SendData(Reg);
-    //DEV_Digital_Write(EPD_CS_PIN, 1);
-    gpio_pin_set_dt(&data_cmd_gpio, 0);
-    gpio_pin_set_dt(&chip_select_gpio, 0);
+    // gpio_pin_set_dt(&data_cmd_gpio, 0);
+    // gpio_pin_set_dt(&chip_select_gpio, 0);
     send_n_bytes(&Reg, 1);
-    gpio_pin_set_dt(&chip_select_gpio, 1);
+    // gpio_pin_set_dt(&chip_select_gpio, 1);
 }
 
 /******************************************************************************
@@ -169,26 +165,18 @@ parameter:
 ******************************************************************************/
 static void EPD_4in26_SendData(uint8_t Data)
 {
-    //DEV_Digital_Write(EPD_DC_PIN, 1);
-    //DEV_Digital_Write(EPD_CS_PIN, 0);
-    //DEV_SPI_SendData(Data);
-    //DEV_Digital_Write(EPD_CS_PIN, 1);
-    gpio_pin_set_dt(&data_cmd_gpio, 1);
-    gpio_pin_set_dt(&chip_select_gpio, 0);
+    // gpio_pin_set_dt(&data_cmd_gpio, 1);
+    // gpio_pin_set_dt(&chip_select_gpio, 0);
     send_n_bytes(&Data, 1);
-    gpio_pin_set_dt(&chip_select_gpio, 1);
+    // gpio_pin_set_dt(&chip_select_gpio, 1);
 }
 
 static void EPD_4in26_SendData2(uint8_t *pData, size_t len)
 {
-    // DEV_Digital_Write(EPD_DC_PIN, 1);
-    // DEV_Digital_Write(EPD_CS_PIN, 0);
-    // DEV_SPI_Write_nByte(pData, len);
-    // DEV_Digital_Write(EPD_CS_PIN, 1);
-    gpio_pin_set_dt(&data_cmd_gpio, 1);
-    gpio_pin_set_dt(&chip_select_gpio, 0);
+    // gpio_pin_set_dt(&data_cmd_gpio, 1);
+    // gpio_pin_set_dt(&chip_select_gpio, 0);
     send_n_bytes(pData, len);
-    gpio_pin_set_dt(&chip_select_gpio, 1);
+    // gpio_pin_set_dt(&chip_select_gpio, 1);
 }
 
 /******************************************************************************
@@ -200,8 +188,8 @@ void EPD_4in26_ReadBusy(void)
     LOG_DBG("e-Paper busy");
 	while(1)
 	{	 //=1 BUSY (ACTIVE HIGH)
-		if(gpio_pin_get_dt(&busy_gpio)==0) 
-			break;
+		// if(gpio_pin_get_dt(&busy_gpio)==0) 
+		// 	break;
 		k_msleep(20);
 	}
 	k_msleep(20);
@@ -311,18 +299,18 @@ void EPD_4in26_Init(void)
         return;
     }
 
-    gpio_pin_configure_dt(&chip_select_gpio, GPIO_OUTPUT_INACTIVE);
-    gpio_pin_set_dt(&chip_select_gpio, 1);
+    // gpio_pin_configure_dt(&chip_select_gpio, GPIO_OUTPUT_INACTIVE);
+    // gpio_pin_set_dt(&chip_select_gpio, 1);
 
-    if (!device_is_ready(chip_select_gpio.port)) 
-    {
-        LOG_ERR("EPAPER CS GPIO not ready");
-        return;
-    }
+    // if (!device_is_ready(chip_select_gpio.port)) 
+    // {
+    //     LOG_ERR("EPAPER CS GPIO not ready");
+    //     return;
+    // }
     
-    gpio_pin_configure_dt(&reset_gpio, GPIO_OUTPUT_INACTIVE);
-    gpio_pin_configure_dt(&data_cmd_gpio, GPIO_OUTPUT_INACTIVE);
-    gpio_pin_configure_dt(&busy_gpio, GPIO_INPUT);
+    // gpio_pin_configure_dt(&reset_gpio, GPIO_OUTPUT_INACTIVE);
+    // gpio_pin_configure_dt(&data_cmd_gpio, GPIO_OUTPUT_INACTIVE);
+    // gpio_pin_configure_dt(&busy_gpio, GPIO_INPUT);
 
 	EPD_4in26_Reset();
 	k_msleep(100);
