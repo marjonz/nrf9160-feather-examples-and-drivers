@@ -79,8 +79,14 @@ static const struct gpio_dt_spec data_cmd_gpio = GPIO_DT_SPEC_GET(EPAPER_DEVICE_
 static const struct gpio_dt_spec busy_gpio = GPIO_DT_SPEC_GET(EPAPER_DEVICE_NODE_ID, busy_gpios);
 static const struct gpio_dt_spec power_gpio = GPIO_DT_SPEC_GET(EPAPER_DEVICE_NODE_ID, pwr_gpios);
 
-#define POWER_ON()  gpio_pin_set_dt(&power_gpio, 1)    // Turn on ePaper power supply.
-#define POWER_OFF() gpio_pin_set_dt(&power_gpio, 0);   // Turn off ePaper power supply.
+// Turn on ePaper power supply.
+#define POWER_ON()  do { \
+                        gpio_pin_set_dt(&power_gpio, 1);    \
+                        k_msleep(10);                       \
+                    } while (0)
+
+// Turn off ePaper power supply.
+#define POWER_OFF() gpio_pin_set_dt(&power_gpio, 0);
 
 #define TX_BUFFER_SIZE 120 
 #define RX_BUFFER_SIZE 20 
@@ -315,7 +321,6 @@ void EPD_4in26_Init(void)
     gpio_pin_configure_dt(&power_gpio, GPIO_OUTPUT_INACTIVE);
     gpio_pin_configure_dt(&busy_gpio, GPIO_INPUT);
 
-    // When do we power off though?
     POWER_ON();
 
 	EPD_4in26_Reset();
@@ -676,4 +681,5 @@ void EPD_4in26_Sleep(void)
 	EPD_4in26_SendCommand(0x10u); //enter deep sleep
 	EPD_4in26_SendData(0x03u); 
 	k_msleep(100);
+    POWER_OFF();
 }
