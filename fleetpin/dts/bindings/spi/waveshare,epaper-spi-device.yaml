@@ -1,0 +1,42 @@
+# Copyright (c) 2026, Flexware Ltd
+# SPDX-License-Identifier: Apache-2.0
+
+compatible: "waveshare,epaper-spi-device"
+
+include: [spi-device.yaml]
+
+description: |
+    This binding provides the ePaper SPI device resources to
+    build and run epaper driver in Zephyr.
+    Additional GPIOs required for ePaper display operation should also be defined.
+
+properties:
+  chip-select-gpios:
+    type: phandle-array
+    required: true
+    description: |
+      Board GPIO input used to manually control the chip select.
+
+  busy-gpios:
+    type: phandle-array
+    required: true
+    description: |
+      Board GPIO input used to detect that the device is busy.
+
+  rst-gpios:
+    type: phandle-array
+    required: true
+    description: |
+      Board GPIO output used to reset the device.
+  
+  data-command-gpios:
+    type: phandle-array
+    required: true
+    description: |
+      Board GPIO output used to select if the transaction is data or command.
+
+  pwr-gpios:
+    type: phandle-array
+    required: true
+    description: |
+      Board GPIO output used to power on/off the device.
