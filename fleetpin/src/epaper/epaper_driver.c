@@ -80,7 +80,6 @@ static const struct spi_dt_spec spi =
 #define DATA_CMD_IS_DATA        1
 
 #define SPI_EPAPER_NODE_ID DT_NODELABEL(epaper_device)
-static const struct gpio_dt_spec chip_select_gpio = GPIO_DT_SPEC_GET(EPAPER_DEVICE_NODE_ID, chip_select_gpios);
 static const struct gpio_dt_spec reset_gpio = GPIO_DT_SPEC_GET(EPAPER_DEVICE_NODE_ID, rst_gpios);
 static const struct gpio_dt_spec data_cmd_gpio = GPIO_DT_SPEC_GET(EPAPER_DEVICE_NODE_ID, data_command_gpios);
 static const struct gpio_dt_spec busy_gpio = GPIO_DT_SPEC_GET(EPAPER_DEVICE_NODE_ID, busy_gpios);
@@ -94,14 +93,6 @@ static const struct gpio_dt_spec power_gpio = GPIO_DT_SPEC_GET(EPAPER_DEVICE_NOD
 
 // Turn off ePaper power supply.
 #define POWER_OFF() gpio_pin_set_dt(&power_gpio, ACTIVE_HIGH_INACTIVE);
-
-#define CHIPSELECT_INACTIVE()   do { \
-                                gpio_pin_set_dt(&chip_select_gpio, ACTIVE_LOW_INACTIVE); \
-                         } while (0)
-
-#define CHIPSELECT_ACTIVE()   do { \
-                                gpio_pin_set_dt(&chip_select_gpio, ACTIVE_LOW_ACTIVE); \
-                         } while (0)
 
 #define SEND_COMMAND()   do { \
                                 gpio_pin_set_dt(&data_cmd_gpio, DATA_CMD_IS_COMMAND); \
@@ -185,13 +176,9 @@ parameter:
 ******************************************************************************/
 static void EPD_4in26_SendCommand(uint8_t Reg)
 {
-    // Make sure the chip select is inactive
-    CHIPSELECT_INACTIVE();
     LOG_DBG("EPD_4in26_SendCommand: 0x%02X", Reg);
     SEND_COMMAND();
-    CHIPSELECT_ACTIVE();
     send_n_bytes(&Reg, sizeof(Reg));
-    CHIPSELECT_INACTIVE();
 }
 
 /******************************************************************************
@@ -201,24 +188,16 @@ parameter:
 ******************************************************************************/
 static void EPD_4in26_SendData(uint8_t Data)
 {
-    // Make sure the chip select is inactive
-    CHIPSELECT_INACTIVE();
     LOG_DBG("EPD_4in26_SendData: 0x%02X", Data);
     SEND_DATA();
-    CHIPSELECT_ACTIVE();
     send_n_bytes(&Data, 1);
-    CHIPSELECT_INACTIVE();
 }
 
 static void EPD_4in26_SendData2(uint8_t *pData, size_t len)
 {
-    // Make sure the chip select is inactive
-    CHIPSELECT_INACTIVE();
     LOG_DBG("EPD_4in26_SendData2: 0x%02X of len: %d", pData[0], len);
     SEND_DATA();
-    CHIPSELECT_ACTIVE();
     send_n_bytes(pData, len);
-    CHIPSELECT_INACTIVE();
 }
 
 /******************************************************************************
@@ -243,7 +222,7 @@ static inline void send_display_update_data(uint8_t data)
 	EPD_4in26_SendCommand(0x22u); //Display Update Control
 	EPD_4in26_SendData(data);
 	EPD_4in26_SendCommand(0x20u); //Activate Display Update Sequence
-	EPD_4in26_ReadBusy();
+	//EPD_4in26_ReadBusy();
 }
 
 /******************************************************************************
@@ -337,19 +316,29 @@ static void configure_pins_and_power_on(void)
         return;
     }
 
-    gpio_pin_configure_dt(&chip_select_gpio, GPIO_OUTPUT_ACTIVE);
-    gpio_pin_set_dt(&chip_select_gpio, ACTIVE_LOW_INACTIVE);
-
-    if (!device_is_ready(chip_select_gpio.port)) 
+    gpio_pin_configure_dt(&reset_gpio, GPIO_OUTPUT_ACTIVE);
+    gpio_pin_set_dt(&reset_gpio, ACTIVE_LOW_INACTIVE);
+    if (!device_is_ready(reset_gpio.port)) 
     {
-        LOG_ERR("EPAPER CS GPIO not ready");
+        LOG_ERR("EPAPER RESET GPIO not ready");
+        return;
+    }
+
+    gpio_pin_configure_dt(&data_cmd_gpio, GPIO_OUTPUT_LOW);
+    if (!device_is_ready(data_cmd_gpio.port)) 
+    {
+        LOG_ERR("EPAPER DATA/CMD GPIO not ready");
+        return;
+    }
+
+    gpio_pin_configure_dt(&power_gpio, GPIO_OUTPUT_LOW);
+    if (!device_is_ready(power_gpio.port)) 
+    {
+        LOG_ERR("EPAPER POWER GPIO not ready");
         return;
     }
     
-    gpio_pin_configure_dt(&reset_gpio, GPIO_OUTPUT_HIGH);
-    gpio_pin_configure_dt(&data_cmd_gpio, GPIO_OUTPUT_LOW);
-    gpio_pin_configure_dt(&power_gpio, GPIO_OUTPUT_LOW);
-    gpio_pin_configure_dt(&busy_gpio, GPIO_OUTPUT_HIGH);
+    gpio_pin_configure_dt(&busy_gpio, GPIO_INPUT);
 
     // Set GPIO to default state
     // gpio_pin_set_dt(&reset_gpio, 1);
@@ -373,9 +362,9 @@ void EPD_4in26_Init(void)
     LOG_DBG("EPAPER device reset. Init");
 	k_msleep(100);
 
-	EPD_4in26_ReadBusy();   
+	//EPD_4in26_ReadBusy();   
 	EPD_4in26_SendCommand(0x12u);  //SWRESET
-	EPD_4in26_ReadBusy();   
+	//EPD_4in26_ReadBusy();   
 	
 	EPD_4in26_SendCommand(0x18u); // use the internal temperature sensor
 	EPD_4in26_SendData(0x80u);
