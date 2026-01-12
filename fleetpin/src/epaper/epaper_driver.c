@@ -39,7 +39,7 @@ from : https://github.com/waveshareteam/e-Paper/blob/master/RaspberryPi_JetsonNa
 #include <zephyr/drivers/spi.h>
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_REGISTER(epaper_driver);
+LOG_MODULE_REGISTER(epaper_driver, LOG_LEVEL_DBG);
 
 const unsigned char LUT_DATA_4Gray[112] =    //112bytes
 {											
@@ -68,9 +68,16 @@ static const struct device *spi_dev = DEVICE_DT_GET(DT_BUS(EPAPER_DEVICE_NODE_ID
 static const struct spi_dt_spec spi = 
     SPI_DT_SPEC_GET(
         EPAPER_DEVICE_NODE_ID, 
-        (SPI_OP_MODE_MASTER | SPI_WORD_SET(8) | SPI_TRANSFER_MSB | SPI_MODE_CPOL | SPI_MODE_CPHA), 
+        (SPI_OP_MODE_MASTER | SPI_WORD_SET(8) | SPI_TRANSFER_MSB), 
         0
     );
+
+#define ACTIVE_LOW_ACTIVE       0
+#define ACTIVE_LOW_INACTIVE     1   
+#define ACTIVE_HIGH_ACTIVE      1
+#define ACTIVE_HIGH_INACTIVE    0
+#define DATA_CMD_IS_COMMAND     0
+#define DATA_CMD_IS_DATA        1
 
 #define SPI_EPAPER_NODE_ID DT_NODELABEL(epaper_device)
 static const struct gpio_dt_spec chip_select_gpio = GPIO_DT_SPEC_GET(EPAPER_DEVICE_NODE_ID, chip_select_gpios);
@@ -81,12 +88,29 @@ static const struct gpio_dt_spec power_gpio = GPIO_DT_SPEC_GET(EPAPER_DEVICE_NOD
 
 // Turn on ePaper power supply.
 #define POWER_ON()  do { \
-                        gpio_pin_set_dt(&power_gpio, 1);    \
+                        gpio_pin_set_dt(&power_gpio, ACTIVE_HIGH_ACTIVE);    \
                         k_msleep(10);                       \
                     } while (0)
 
 // Turn off ePaper power supply.
-#define POWER_OFF() gpio_pin_set_dt(&power_gpio, 0);
+#define POWER_OFF() gpio_pin_set_dt(&power_gpio, ACTIVE_HIGH_INACTIVE);
+
+#define CHIPSELECT_INACTIVE()   do { \
+                                gpio_pin_set_dt(&chip_select_gpio, ACTIVE_LOW_INACTIVE); \
+                         } while (0)
+
+#define CHIPSELECT_ACTIVE()   do { \
+                                gpio_pin_set_dt(&chip_select_gpio, ACTIVE_LOW_ACTIVE); \
+                         } while (0)
+
+#define SEND_COMMAND()   do { \
+                                gpio_pin_set_dt(&data_cmd_gpio, DATA_CMD_IS_COMMAND); \
+                         } while (0)
+
+#define SEND_DATA()   do { \
+                                gpio_pin_set_dt(&data_cmd_gpio, DATA_CMD_IS_DATA); \
+                      } while (0)
+                            
 
 #define TX_BUFFER_SIZE 120 
 #define RX_BUFFER_SIZE 20 
@@ -119,11 +143,11 @@ parameter:
 ******************************************************************************/
 static void EPD_4in26_Reset(void)
 {
-    gpio_pin_set_dt(&reset_gpio, 1);
+    gpio_pin_set_dt(&reset_gpio, ACTIVE_LOW_INACTIVE);
     k_msleep(100);
-    gpio_pin_set_dt(&reset_gpio, 0);
+    gpio_pin_set_dt(&reset_gpio, ACTIVE_LOW_ACTIVE);
     k_msleep(2);
-    gpio_pin_set_dt(&reset_gpio, 1);
+    gpio_pin_set_dt(&reset_gpio, ACTIVE_LOW_INACTIVE);
     k_msleep(100);
 }
 
@@ -135,12 +159,13 @@ static void send_n_bytes(uint8_t *data, size_t len)
     if (spi_dev != NULL) 
     {
         memset(tx_buf_data, 0, sizeof(tx_buf_data));
-        memset(rx_buf_data, 0, sizeof(rx_buf_data));
+        //memset(rx_buf_data, 0, sizeof(rx_buf_data));
         size_t data_len = len < TX_BUFFER_SIZE ? len : sizeof(tx_buf_data);
         memcpy(tx_buf_data, data, data_len);
         tx_buf.len = data_len;
-        rx_buf.len = data_len;
-        int ret = spi_transceive_dt(&spi, &tx, &rx);
+        //rx_buf.len = data_len;
+        //int ret = spi_transceive_dt(&spi, &tx, &rx);
+        int ret = spi_write_dt(&spi, &tx);
         if (ret != 0) 
         {
             LOG_DBG("SPI command transfer failed: %d", ret);
@@ -160,10 +185,13 @@ parameter:
 ******************************************************************************/
 static void EPD_4in26_SendCommand(uint8_t Reg)
 {
-    gpio_pin_set_dt(&data_cmd_gpio, 0);
-    gpio_pin_set_dt(&chip_select_gpio, 0);
-    send_n_bytes(&Reg, 1);
-    gpio_pin_set_dt(&chip_select_gpio, 1);
+    // Make sure the chip select is inactive
+    CHIPSELECT_INACTIVE();
+    LOG_DBG("EPD_4in26_SendCommand: 0x%02X", Reg);
+    SEND_COMMAND();
+    CHIPSELECT_ACTIVE();
+    send_n_bytes(&Reg, sizeof(Reg));
+    CHIPSELECT_INACTIVE();
 }
 
 /******************************************************************************
@@ -173,18 +201,24 @@ parameter:
 ******************************************************************************/
 static void EPD_4in26_SendData(uint8_t Data)
 {
-    gpio_pin_set_dt(&data_cmd_gpio, 1);
-    gpio_pin_set_dt(&chip_select_gpio, 0);
+    // Make sure the chip select is inactive
+    CHIPSELECT_INACTIVE();
+    LOG_DBG("EPD_4in26_SendData: 0x%02X", Data);
+    SEND_DATA();
+    CHIPSELECT_ACTIVE();
     send_n_bytes(&Data, 1);
-    gpio_pin_set_dt(&chip_select_gpio, 1);
+    CHIPSELECT_INACTIVE();
 }
 
 static void EPD_4in26_SendData2(uint8_t *pData, size_t len)
 {
-    // gpio_pin_set_dt(&data_cmd_gpio, 1);
-    // gpio_pin_set_dt(&chip_select_gpio, 0);
+    // Make sure the chip select is inactive
+    CHIPSELECT_INACTIVE();
+    LOG_DBG("EPD_4in26_SendData2: 0x%02X of len: %d", pData[0], len);
+    SEND_DATA();
+    CHIPSELECT_ACTIVE();
     send_n_bytes(pData, len);
-    // gpio_pin_set_dt(&chip_select_gpio, 1);
+    CHIPSELECT_INACTIVE();
 }
 
 /******************************************************************************
@@ -196,7 +230,7 @@ void EPD_4in26_ReadBusy(void)
     LOG_DBG("e-Paper busy");
 	while(1)
 	{	 //=1 BUSY (ACTIVE HIGH)
-		if(gpio_pin_get_dt(&busy_gpio)==0) 
+		if(gpio_pin_get_dt(&busy_gpio)==ACTIVE_LOW_ACTIVE) 
 			break;
 		k_msleep(20);
 	}
@@ -295,11 +329,7 @@ static void EPD_4in26_SetCursor(uint16_t Xstart, uint16_t Ystart)
     send_position_data(Ystart);
 }
 
-/******************************************************************************
-function :	Initialize the e-Paper register
-parameter:
-******************************************************************************/
-void EPD_4in26_Init(void)
+static void configure_pins_and_power_on(void)
 {
     if (!spi_is_ready_dt(&spi)) 
     {
@@ -307,8 +337,8 @@ void EPD_4in26_Init(void)
         return;
     }
 
-    gpio_pin_configure_dt(&chip_select_gpio, GPIO_OUTPUT_INACTIVE);
-    gpio_pin_set_dt(&chip_select_gpio, 1);
+    gpio_pin_configure_dt(&chip_select_gpio, GPIO_OUTPUT_ACTIVE);
+    gpio_pin_set_dt(&chip_select_gpio, ACTIVE_LOW_INACTIVE);
 
     if (!device_is_ready(chip_select_gpio.port)) 
     {
@@ -316,14 +346,31 @@ void EPD_4in26_Init(void)
         return;
     }
     
-    gpio_pin_configure_dt(&reset_gpio, GPIO_OUTPUT_INACTIVE);
-    gpio_pin_configure_dt(&data_cmd_gpio, GPIO_OUTPUT_INACTIVE);
-    gpio_pin_configure_dt(&power_gpio, GPIO_OUTPUT_INACTIVE);
-    gpio_pin_configure_dt(&busy_gpio, GPIO_INPUT);
+    gpio_pin_configure_dt(&reset_gpio, GPIO_OUTPUT_HIGH);
+    gpio_pin_configure_dt(&data_cmd_gpio, GPIO_OUTPUT_LOW);
+    gpio_pin_configure_dt(&power_gpio, GPIO_OUTPUT_LOW);
+    gpio_pin_configure_dt(&busy_gpio, GPIO_OUTPUT_HIGH);
+
+    // Set GPIO to default state
+    // gpio_pin_set_dt(&reset_gpio, 1);
+    // gpio_pin_set_dt(&data_cmd_gpio, 0);
+    // gpio_pin_set_dt(&chip_select_gpio, 1);
 
     POWER_ON();
 
+    LOG_DBG("EPAPER GPIO ready and device is powered on.");
+}
+
+/******************************************************************************
+function :	Initialize the e-Paper register
+parameter:
+******************************************************************************/
+void EPD_4in26_Init(void)
+{
+    configure_pins_and_power_on();
+
 	EPD_4in26_Reset();
+    LOG_DBG("EPAPER device reset. Init");
 	k_msleep(100);
 
 	EPD_4in26_ReadBusy();   
@@ -360,7 +407,10 @@ void EPD_4in26_Init(void)
 
 void EPD_4in26_Init_Fast(void)
 {
+    configure_pins_and_power_on();
+
 	EPD_4in26_Reset();
+    LOG_DBG("EPAPER device reset. Init Fast");
 	k_msleep(100);
 
 	EPD_4in26_ReadBusy();   
@@ -407,7 +457,10 @@ void EPD_4in26_Init_Fast(void)
 
 void EPD_4in26_Init_4GRAY(void)
 {
+    configure_pins_and_power_on();
+    
     EPD_4in26_Reset();
+    LOG_DBG("EPAPER device reset. Init 4GRAY");
 	k_msleep(100);
 
 	EPD_4in26_ReadBusy();   
@@ -494,7 +547,9 @@ void EPD_4in26_Display_Base(uint8_t *Image)
 	uint16_t height = EPD_4in26_HEIGHT;
 	uint16_t width = EPD_4in26_WIDTH/8;
 	
-	EPD_4in26_SendCommand(0x24u);   //write RAM for black(0)/white (1)
+    LOG_DBG("EPD_4in26_Display_Base");
+	
+    EPD_4in26_SendCommand(0x24u);   //write RAM for black(0)/white (1)
 	for(i = 0u; i < height; i++)
 	{
 		EPD_4in26_SendData2((uint8_t *)(Image+i*width), width);
@@ -513,6 +568,8 @@ void EPD_4in26_Display_Fast(uint8_t *Image)
 	uint16_t i;
 	uint16_t height = EPD_4in26_HEIGHT;
 	uint16_t width = EPD_4in26_WIDTH/8;
+
+    LOG_DBG("EPD_4in26_Display_Fast");
 	
 	EPD_4in26_SendCommand(0x24u);   //write RAM for black(0)/white (1)
 	for(i = 0u; i < height; i++)
@@ -528,6 +585,8 @@ void EPD_4in26_Display_Part(uint8_t *Image, uint16_t x, uint16_t y, uint16_t w, 
 	uint16_t height = l;
 	uint16_t width =  (w % 8u == 0u) ? (w / 8u): ((w / 8u) + 1);
 
+    LOG_DBG("EPD_4in26_Display_Fast");
+    
     EPD_4in26_Reset();
 
 	EPD_4in26_SendCommand(0x18u); // use the internal temperature sensor

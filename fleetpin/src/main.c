@@ -17,9 +17,12 @@ LOG_MODULE_REGISTER(main);
 #include <modem/nrf_modem_lib.h>
 #include <nrf_modem_at.h>
 
+#include <zephyr/drivers/mfd/npm1300.h>
+
 /* Local */
 #include "cloud/cloud.h"
 #include "gnss/gnss.h"
+#include "epaper/epaper.h"
 
 #define CONFIG_RETRY_DELAY_MINUTES 1
 
@@ -95,6 +98,7 @@ static void on_modem_lib_init(int ret, void *ctx)
 /* Define thread priorities (lower number = higher priority) */
 #define CLOUD_PRIORITY 7 
 #define GNSS_PRIORITY  8 
+#define EPAPER_PRIORITY 9
 
 /* Thread entry function for the first thread (e.g., blinking an LED) */
 void cloud_thr(void *p1, void *p2, void *p3) 
@@ -113,7 +117,7 @@ void cloud_thr(void *p1, void *p2, void *p3)
     }
 
     /* Power saving is turned on */
-    lte_lc_psm_req(true);
+    lte_lc_psm_req(false);
 
     /* Connect */
     LOG_INF("Connecting to LTE...");
@@ -178,9 +182,22 @@ void gnss_thr(void *p1, void *p2, void *p3)
     gnss_thread();
 }
 
+/* Thread entry function for the second thread */
+void epaper_thr(void *p1, void *p2, void *p3) 
+{
+    ARG_UNUSED(p1);
+    ARG_UNUSED(p2);
+    ARG_UNUSED(p3);
+
+    epaper_init();
+    k_sleep(K_SECONDS(2));
+    epaper_display_test();
+}
+
 /* Define the threads using K_THREAD_DEFINE */
-K_THREAD_DEFINE(cloud_thread_id, STACK_SIZE, cloud_thr, NULL, NULL, NULL, CLOUD_PRIORITY, 0, 0);
-K_THREAD_DEFINE(gnss_thread_id, STACK_SIZE, gnss_thr, NULL, NULL, NULL, GNSS_PRIORITY, 0, 0);
+//K_THREAD_DEFINE(cloud_thread_id, STACK_SIZE, cloud_thr, NULL, NULL, NULL, CLOUD_PRIORITY, 0, 0);
+//K_THREAD_DEFINE(gnss_thread_id, STACK_SIZE, gnss_thr, NULL, NULL, NULL, GNSS_PRIORITY, 0, 0);
+//K_THREAD_DEFINE(epaper_thread_id, STACK_SIZE, epaper_thr, NULL, NULL, NULL, EPAPER_PRIORITY, 0, 0);
 
 
 int main(void)
@@ -189,6 +206,7 @@ int main(void)
 
     LOG_INF("HTTPS Sample. Board: %s", CONFIG_BOARD);
 
+    #if 0
     /* GNSS pre-init functions */
     (void) gnss_pre_init();
 
@@ -202,7 +220,18 @@ int main(void)
         LOG_ERR("Failed to init modem lib. (err: %i)", err);
         return err;
     }
+    #endif
 
+    err = epaper_init();
+    if (err < 0)
+    {
+        LOG_ERR("Failed to init epaper. (err: %i)", err);
+        return err;
+    }
+
+    k_sleep(K_SECONDS(1));
+    epaper_display_test();
+    
     /* The main thread can also perform work or go to sleep */
     while (1) {
         k_sleep(K_FOREVER); /* Sleep the main thread indefinitely */

@@ -1,0 +1,37 @@
+/*
+ * Copyright (c) 2024 Circuit Dojo LLC
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+&i2c2 {
+
+	sts4x: sts4x@44 {
+		compatible = "sensirion,sts4x";
+		reg = <0x44>;
+		repeatability = <2>;
+	};
+	
+	npm1300_pmic: pmic@6b {
+        compatible = "nordic,npm1300";
+        reg = <0x6b>;
+
+        regulators {
+            compatible = "nordic,npm1300-regulator";
+
+            BUCK1: BUCK1 {
+				regulator-min-microvolt = <3300000>;
+				regulator-max-microvolt = <3300000>;
+                regulator-init-microvolt = <3300000>; /* 3.3V */
+				startup-delay-us = <2000>;
+				regulator-always-on;
+                // regulator-boot-on;
+            };
+            BUCK2: BUCK2 {
+				regulator-min-microvolt = <3300000>;
+				regulator-max-microvolt = <3300000>;
+                regulator-boot-on;
+            };
+        };
+    };
+};
