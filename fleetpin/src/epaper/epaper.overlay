@@ -32,7 +32,8 @@
         compatible = "waveshare,epaper-spi-device";
         reg = <0>;
 		// Write speed can go up to 20MHz, but Read speed is only up to 2.5MHz. 
-		spi-max-frequency = <2000000>;	// Conservative 2MHz
+		// But the device does not have a MOSI pin connection, so always only "write" to it.
+		spi-max-frequency = <5000000>;	// Conservative 4MHz
 
         // --- Additional GPIOs defined here ---
         rst-gpios   = <&gpio0 13 GPIO_ACTIVE_LOW>;
