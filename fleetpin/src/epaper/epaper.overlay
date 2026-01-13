@@ -33,12 +33,12 @@
         reg = <0>;
 		// Write speed can go up to 20MHz, but Read speed is only up to 2.5MHz. 
 		// But the device does not have a MOSI pin connection, so always only "write" to it.
-		spi-max-frequency = <5000000>;	// Conservative 4MHz
+		spi-max-frequency = <5000000>;	// Conservative 5MHz
 
         // --- Additional GPIOs defined here ---
         rst-gpios   = <&gpio0 13 GPIO_ACTIVE_LOW>;
         data-command-gpios    = <&gpio0 14 GPIO_ACTIVE_LOW>;
-        busy-gpios  = <&gpio0 15 GPIO_ACTIVE_LOW>;
+        busy-gpios  = <&gpio0 15 GPIO_PULL_DOWN>;
 		chip-select-gpios  = <&gpio0 16 GPIO_ACTIVE_LOW>;
         pwr-gpios = <&gpio0 17 GPIO_ACTIVE_HIGH>;
     };
