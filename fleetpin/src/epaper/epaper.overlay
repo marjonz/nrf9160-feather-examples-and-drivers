@@ -31,7 +31,8 @@
     epaper_device: epaper_device@0 {
         compatible = "waveshare,epaper-spi-device";
         reg = <0>;
-		spi-max-frequency = <2000000>;
+		// Write speed can go up to 20MHz, but Read speed is only up to 2.5MHz. 
+		spi-max-frequency = <2000000>;	// Conservative 2MHz
 
         // --- Additional GPIOs defined here ---
         rst-gpios   = <&gpio0 13 GPIO_ACTIVE_LOW>;

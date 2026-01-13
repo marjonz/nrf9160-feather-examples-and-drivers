@@ -94,6 +94,14 @@ static const struct gpio_dt_spec power_gpio = GPIO_DT_SPEC_GET(EPAPER_DEVICE_NOD
 // Turn off ePaper power supply.
 #define POWER_OFF() gpio_pin_set_dt(&power_gpio, ACTIVE_HIGH_INACTIVE);
 
+#define RESET_ACTIVE()   do { \
+                                gpio_pin_set_dt(&reset_gpio, ACTIVE_HIGH_ACTIVE); \
+                         } while (0)
+
+#define RESET_INACTIVE()   do { \
+                                gpio_pin_set_dt(&reset_gpio, ACTIVE_HIGH_INACTIVE); \
+                         } while (0)
+
 #define SEND_COMMAND()   do { \
                                 gpio_pin_set_dt(&data_cmd_gpio, DATA_CMD_IS_COMMAND); \
                          } while (0)
@@ -134,11 +142,11 @@ parameter:
 ******************************************************************************/
 static void EPD_4in26_Reset(void)
 {
-    gpio_pin_set_dt(&reset_gpio, ACTIVE_LOW_INACTIVE);
+    RESET_INACTIVE();
     k_msleep(100);
-    gpio_pin_set_dt(&reset_gpio, ACTIVE_LOW_ACTIVE);
+    RESET_ACTIVE();
     k_msleep(2);
-    gpio_pin_set_dt(&reset_gpio, ACTIVE_LOW_INACTIVE);
+    RESET_INACTIVE();
     k_msleep(100);
 }
 
@@ -200,6 +208,11 @@ static void EPD_4in26_SendData2(uint8_t *pData, size_t len)
     send_n_bytes(pData, len);
 }
 
+// static inline bool is_busy(void)
+// {
+//     return (gpio_pin_get_dt(&busy_gpio)==ACTIVE_HIGH_ACTIVE);
+// }
+
 /******************************************************************************
 function :	Wait until the busy_pin goes LOW
 parameter:
@@ -207,11 +220,16 @@ parameter:
 void EPD_4in26_ReadBusy(void)
 {
     LOG_DBG("e-Paper busy");
+    int busy_status = gpio_pin_get_dt(&busy_gpio);
 	while(1)
 	{	 //=1 BUSY (ACTIVE HIGH)
-		if(gpio_pin_get_dt(&busy_gpio)==ACTIVE_LOW_ACTIVE) 
+		if(busy_status == ACTIVE_HIGH_INACTIVE) 
+        {
+            // Not busy anymore
 			break;
+        }
 		k_msleep(20);
+        busy_status = gpio_pin_get_dt(&busy_gpio);
 	}
 	k_msleep(20);
     LOG_DBG("e-Paper busy release\r\n");
@@ -222,7 +240,7 @@ static inline void send_display_update_data(uint8_t data)
 	EPD_4in26_SendCommand(0x22u); //Display Update Control
 	EPD_4in26_SendData(data);
 	EPD_4in26_SendCommand(0x20u); //Activate Display Update Sequence
-	//EPD_4in26_ReadBusy();
+	EPD_4in26_ReadBusy();
 }
 
 /******************************************************************************
@@ -316,13 +334,15 @@ static void configure_pins_and_power_on(void)
         return;
     }
 
-    gpio_pin_configure_dt(&reset_gpio, GPIO_OUTPUT_ACTIVE);
-    gpio_pin_set_dt(&reset_gpio, ACTIVE_LOW_INACTIVE);
+    POWER_ON();
+
+    gpio_pin_configure_dt(&reset_gpio, GPIO_OUTPUT_HIGH);
     if (!device_is_ready(reset_gpio.port)) 
     {
         LOG_ERR("EPAPER RESET GPIO not ready");
         return;
     }
+    RESET_INACTIVE();
 
     gpio_pin_configure_dt(&data_cmd_gpio, GPIO_OUTPUT_LOW);
     if (!device_is_ready(data_cmd_gpio.port)) 
@@ -340,13 +360,6 @@ static void configure_pins_and_power_on(void)
     
     gpio_pin_configure_dt(&busy_gpio, GPIO_INPUT);
 
-    // Set GPIO to default state
-    // gpio_pin_set_dt(&reset_gpio, 1);
-    // gpio_pin_set_dt(&data_cmd_gpio, 0);
-    // gpio_pin_set_dt(&chip_select_gpio, 1);
-
-    POWER_ON();
-
     LOG_DBG("EPAPER GPIO ready and device is powered on.");
 }
 
@@ -362,9 +375,9 @@ void EPD_4in26_Init(void)
     LOG_DBG("EPAPER device reset. Init");
 	k_msleep(100);
 
-	//EPD_4in26_ReadBusy();   
+	EPD_4in26_ReadBusy();   
 	EPD_4in26_SendCommand(0x12u);  //SWRESET
-	//EPD_4in26_ReadBusy();   
+	EPD_4in26_ReadBusy();   
 	
 	EPD_4in26_SendCommand(0x18u); // use the internal temperature sensor
 	EPD_4in26_SendData(0x80u);
