@@ -41,6 +41,8 @@ from : https://github.com/waveshareteam/e-Paper/blob/master/RaspberryPi_JetsonNa
 
 LOG_MODULE_REGISTER(epaper_driver, LOG_LEVEL_DBG);
 
+#define DISABLE_BUSY_CHECK_FOR_DEBUGGING    true
+
 const unsigned char LUT_DATA_4Gray[112] =    //112bytes
 {											
     0x80u,	0x48u,	0x4Au,	0x22u,	0x00u,	0x00u,	0x00u,	0x00u,	0x00u,	0x00u,	
@@ -72,14 +74,13 @@ static const struct spi_dt_spec spi =
         0
     );
 
-#define ACTIVE_LOW_ACTIVE       0
-#define ACTIVE_LOW_INACTIVE     1   
-#define ACTIVE_HIGH_ACTIVE      1
-#define ACTIVE_HIGH_INACTIVE    0
+#define INACTIVE_LOGIC          0
+#define ACTIVE_LOGIC            1   
 #define DATA_CMD_IS_COMMAND     0
 #define DATA_CMD_IS_DATA        1
 
 #define SPI_EPAPER_NODE_ID DT_NODELABEL(epaper_device)
+// Reset pin is active low, so idle high.
 static const struct gpio_dt_spec reset_gpio = GPIO_DT_SPEC_GET(EPAPER_DEVICE_NODE_ID, rst_gpios);
 static const struct gpio_dt_spec data_cmd_gpio = GPIO_DT_SPEC_GET(EPAPER_DEVICE_NODE_ID, data_command_gpios);
 static const struct gpio_dt_spec busy_gpio = GPIO_DT_SPEC_GET(EPAPER_DEVICE_NODE_ID, busy_gpios);
@@ -87,19 +88,21 @@ static const struct gpio_dt_spec power_gpio = GPIO_DT_SPEC_GET(EPAPER_DEVICE_NOD
 
 // Turn on ePaper power supply.
 #define POWER_ON()  do { \
-                        gpio_pin_set_dt(&power_gpio, ACTIVE_HIGH_ACTIVE);    \
-                        k_msleep(10);                       \
+                        gpio_pin_set_dt(&power_gpio, ACTIVE_LOGIC); \
+                        k_msleep(10);                               \
                     } while (0)
 
 // Turn off ePaper power supply.
-#define POWER_OFF() gpio_pin_set_dt(&power_gpio, ACTIVE_HIGH_INACTIVE);
+#define POWER_OFF() gpio_pin_set_dt(&power_gpio, INACTIVE_LOGIC);
 
+// NOTE: For some reason, the RESET output pin's logic is inverted in hardware.
+// When writing 1 to the pin, the output is low, and vice versa.
 #define RESET_ACTIVE()   do { \
-                                gpio_pin_set_dt(&reset_gpio, ACTIVE_HIGH_ACTIVE); \
+                                gpio_pin_set_dt(&reset_gpio, ACTIVE_LOGIC); \
                          } while (0)
 
 #define RESET_INACTIVE()   do { \
-                                gpio_pin_set_dt(&reset_gpio, ACTIVE_HIGH_INACTIVE); \
+                                gpio_pin_set_dt(&reset_gpio, INACTIVE_LOGIC); \
                          } while (0)
 
 #define SEND_COMMAND()   do { \
@@ -113,26 +116,16 @@ static const struct gpio_dt_spec power_gpio = GPIO_DT_SPEC_GET(EPAPER_DEVICE_NOD
 
 #define TX_BUFFER_SIZE 120 
 #define RX_BUFFER_SIZE 20 
+// NOTE: The ePaper does not have a MOSI line, to it can't transmit data out.
 static uint8_t tx_buf_data[TX_BUFFER_SIZE] = { 0 };
-static uint8_t rx_buf_data[RX_BUFFER_SIZE] = { 0 };
 static struct spi_buf tx_buf = 
 {
     .buf = tx_buf_data,
     .len = sizeof(tx_buf_data),
 };
-static struct spi_buf rx_buf = 
-{
-    .buf = rx_buf_data,
-    .len = sizeof(rx_buf_data),
-};
 static struct spi_buf_set tx = 
 {
     .buffers = &tx_buf,
-    .count = 1,
-};
-static struct spi_buf_set rx = 
-{
-    .buffers = &rx_buf,
     .count = 1,
 };
 
@@ -158,12 +151,9 @@ static void send_n_bytes(uint8_t *data, size_t len)
     if (spi_dev != NULL) 
     {
         memset(tx_buf_data, 0, sizeof(tx_buf_data));
-        //memset(rx_buf_data, 0, sizeof(rx_buf_data));
         size_t data_len = len < TX_BUFFER_SIZE ? len : sizeof(tx_buf_data);
         memcpy(tx_buf_data, data, data_len);
         tx_buf.len = data_len;
-        //rx_buf.len = data_len;
-        //int ret = spi_transceive_dt(&spi, &tx, &rx);
         int ret = spi_write_dt(&spi, &tx);
         if (ret != 0) 
         {
@@ -173,7 +163,6 @@ static void send_n_bytes(uint8_t *data, size_t len)
     else 
     {
         LOG_DBG("SPI device not initialized");
-        return;
     }
 }
 
@@ -208,33 +197,40 @@ static void EPD_4in26_SendData2(uint8_t *pData, size_t len)
     send_n_bytes(pData, len);
 }
 
-// static inline bool is_busy(void)
-// {
-//     return (gpio_pin_get_dt(&busy_gpio)==ACTIVE_HIGH_ACTIVE);
-// }
-
 /******************************************************************************
 function :	Wait until the busy_pin goes LOW
 parameter:
 ******************************************************************************/
-void EPD_4in26_ReadBusy(void)
+#ifndef DISABLE_BUSY_CHECK_FOR_DEBUGGING
+static inline bool is_busy(void)
 {
-    LOG_DBG("e-Paper busy");
-    int busy_status = gpio_pin_get_dt(&busy_gpio);
-	while(1)
-	{	 //=1 BUSY (ACTIVE HIGH)
-		if(busy_status == ACTIVE_HIGH_INACTIVE) 
-        {
-            // Not busy anymore
-			break;
-        }
-		k_msleep(20);
-        busy_status = gpio_pin_get_dt(&busy_gpio);
-	}
-	k_msleep(20);
-    LOG_DBG("e-Paper busy release\r\n");
+    return (gpio_pin_get_dt(&busy_gpio)==ACTIVE_LOGIC);
 }
 
+void EPD_4in26_ReadBusy(void)
+{
+    bool busy_status = is_busy();
+    while(busy_status != 0)
+	{	 //=1 BUSY (ACTIVE HIGH)
+        LOG_DBG("e-Paper busy: %d", busy_status);
+		k_msleep(20);
+        busy_status = is_busy();
+	}
+	k_msleep(20);
+    LOG_DBG("e-Paper busy release: %d", busy_status);
+}
+
+#else
+void EPD_4in26_ReadBusy(void)
+{
+    LOG_DBG("e-Paper busy release");
+}
+#endif
+
+/******************************************************************************
+function :	Helper function to send display update data
+parameter:
+******************************************************************************/
 static inline void send_display_update_data(uint8_t data)
 {
 	EPD_4in26_SendCommand(0x22u); //Display Update Control
@@ -334,6 +330,13 @@ static void configure_pins_and_power_on(void)
         return;
     }
 
+    
+    gpio_pin_configure_dt(&power_gpio, GPIO_OUTPUT_INACTIVE);
+    if (!device_is_ready(power_gpio.port)) 
+    {
+        LOG_ERR("EPAPER POWER GPIO not ready");
+        return;
+    }
     POWER_ON();
 
     gpio_pin_configure_dt(&reset_gpio, GPIO_OUTPUT_HIGH);
@@ -348,13 +351,6 @@ static void configure_pins_and_power_on(void)
     if (!device_is_ready(data_cmd_gpio.port)) 
     {
         LOG_ERR("EPAPER DATA/CMD GPIO not ready");
-        return;
-    }
-
-    gpio_pin_configure_dt(&power_gpio, GPIO_OUTPUT_LOW);
-    if (!device_is_ready(power_gpio.port)) 
-    {
-        LOG_ERR("EPAPER POWER GPIO not ready");
         return;
     }
     
