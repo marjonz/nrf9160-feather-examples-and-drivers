@@ -41,7 +41,7 @@ from : https://github.com/waveshareteam/e-Paper/blob/master/RaspberryPi_JetsonNa
 
 LOG_MODULE_REGISTER(epaper_driver, LOG_LEVEL_DBG);
 
-#define DISABLE_BUSY_CHECK_FOR_DEBUGGING    true
+//#define DISABLE_BUSY_CHECK_FOR_DEBUGGING    true
 
 const unsigned char LUT_DATA_4Gray[112] =    //112bytes
 {											
@@ -354,7 +354,12 @@ static void configure_pins_and_power_on(void)
         return;
     }
     
-    gpio_pin_configure_dt(&busy_gpio, GPIO_INPUT);
+    if (!gpio_is_ready_dt(&busy_gpio)) 
+    {
+        LOG_ERR("EPAPER BUSY GPIO not ready");
+        return;
+    }
+    gpio_pin_configure_dt(&busy_gpio, GPIO_INPUT | GPIO_PULL_DOWN);
 
     LOG_DBG("EPAPER GPIO ready and device is powered on.");
 }
