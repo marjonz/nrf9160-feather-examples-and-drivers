@@ -38,7 +38,7 @@
         // --- Additional GPIOs defined here ---
         rst-gpios   = <&gpio0 13 GPIO_ACTIVE_LOW>;
         data-command-gpios    = <&gpio0 14 GPIO_ACTIVE_LOW>;
-        busy-gpios  = <&gpio0 15 GPIO_PULL_DOWN>;
+        busy-gpios  = <&gpio0 15 GPIO_ACTIVE_HIGH>;
 		chip-select-gpios  = <&gpio0 16 GPIO_ACTIVE_LOW>;
         pwr-gpios = <&gpio0 17 GPIO_ACTIVE_HIGH>;
     };

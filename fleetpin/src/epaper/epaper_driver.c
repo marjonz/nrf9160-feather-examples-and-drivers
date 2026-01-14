@@ -204,7 +204,7 @@ parameter:
 #ifndef DISABLE_BUSY_CHECK_FOR_DEBUGGING
 static inline bool is_busy(void)
 {
-    return (gpio_pin_get_dt(&busy_gpio)==ACTIVE_LOGIC);
+    return (gpio_pin_get_dt(&busy_gpio) > INACTIVE_LOGIC);
 }
 
 void EPD_4in26_ReadBusy(void)
@@ -218,6 +218,19 @@ void EPD_4in26_ReadBusy(void)
 	}
 	k_msleep(20);
     LOG_DBG("e-Paper busy release: %d", busy_status);
+}
+
+void EPD_4in26_ReadBusy_Debug(void)
+{
+    bool busy_status = is_busy();
+    while(busy_status)
+	{	 //=1 BUSY (ACTIVE HIGH)
+        LOG_DBG("DBG busy: %d", busy_status);
+		k_msleep(1000);
+        busy_status = is_busy();
+	}
+	k_msleep(1000);
+    LOG_DBG("DBG release: %d", busy_status);
 }
 
 #else

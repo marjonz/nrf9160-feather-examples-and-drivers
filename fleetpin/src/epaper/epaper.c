@@ -55,3 +55,8 @@ void epaper_display_test(void)
     k_msleep(2000);
     #endif
 }
+
+void epaper_debug_busy(void)
+{
+    EPD_4in26_ReadBusy_Debug();
+}
