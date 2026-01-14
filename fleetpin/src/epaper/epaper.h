@@ -18,3 +18,5 @@ int epaper_init(void);
  *
  */
 void epaper_display_test(void);
+
+void epaper_debug_busy(void);

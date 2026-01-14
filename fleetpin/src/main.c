@@ -230,7 +230,8 @@ int main(void)
     }
 
     k_sleep(K_SECONDS(1));
-    epaper_display_test();
+    // epaper_display_test();
+    epaper_debug_busy();
     
     /* The main thread can also perform work or go to sleep */
     while (1) {
