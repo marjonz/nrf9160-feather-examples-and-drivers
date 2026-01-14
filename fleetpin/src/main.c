@@ -113,7 +113,7 @@ void cloud_thr(void *p1, void *p2, void *p3)
     }
 
     /* Power saving is turned on */
-    lte_lc_psm_req(true);
+    lte_lc_psm_req(false);
 
     /* Connect */
     LOG_INF("Connecting to LTE...");
