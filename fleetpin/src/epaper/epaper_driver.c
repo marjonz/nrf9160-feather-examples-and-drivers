@@ -39,9 +39,11 @@ from : https://github.com/waveshareteam/e-Paper/blob/master/RaspberryPi_JetsonNa
 #include <zephyr/drivers/spi.h>
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_REGISTER(epaper_driver, LOG_LEVEL_DBG);
+#ifdef DISABLE_BUSY_CHECK_FOR_DEBUGGING
+#include <hal/nrf_gpio.h>
+#endif
 
-//#define DISABLE_BUSY_CHECK_FOR_DEBUGGING    true
+LOG_MODULE_REGISTER(epaper_driver, LOG_LEVEL_DBG);
 
 const unsigned char LUT_DATA_4Gray[112] =    //112bytes
 {											
@@ -85,6 +87,7 @@ static const struct gpio_dt_spec reset_gpio = GPIO_DT_SPEC_GET(EPAPER_DEVICE_NOD
 static const struct gpio_dt_spec data_cmd_gpio = GPIO_DT_SPEC_GET(EPAPER_DEVICE_NODE_ID, data_command_gpios);
 static const struct gpio_dt_spec busy_gpio = GPIO_DT_SPEC_GET(EPAPER_DEVICE_NODE_ID, busy_gpios);
 static const struct gpio_dt_spec power_gpio = GPIO_DT_SPEC_GET(EPAPER_DEVICE_NODE_ID, pwr_gpios);
+static const struct gpio_dt_spec chip_select_gpio = GPIO_DT_SPEC_GET(EPAPER_DEVICE_NODE_ID, chip_select_gpios);
 
 // Turn on ePaper power supply.
 #define POWER_ON()  do { \
@@ -103,6 +106,14 @@ static const struct gpio_dt_spec power_gpio = GPIO_DT_SPEC_GET(EPAPER_DEVICE_NOD
 
 #define RESET_INACTIVE()   do { \
                                 gpio_pin_set_dt(&reset_gpio, INACTIVE_LOGIC); \
+                         } while (0)
+
+#define CS_ACTIVE()   do { \
+                                gpio_pin_set_dt(&chip_select_gpio, ACTIVE_LOGIC); \
+                         } while (0)
+
+#define CS_INACTIVE()   do { \
+                                gpio_pin_set_dt(&chip_select_gpio, INACTIVE_LOGIC); \
                          } while (0)
 
 #define SEND_COMMAND()   do { \
@@ -143,6 +154,12 @@ static void EPD_4in26_Reset(void)
     k_msleep(100);
 }
 
+
+static inline bool is_busy(void)
+{
+    return (gpio_pin_get_dt(&busy_gpio) != INACTIVE_LOGIC);
+}
+
 /******************************************************************************
  * Helper function to send n bytes over SPI
  *****************************************************************************/
@@ -152,12 +169,25 @@ static void send_n_bytes(uint8_t *data, size_t len)
     {
         memset(tx_buf_data, 0, sizeof(tx_buf_data));
         size_t data_len = len < TX_BUFFER_SIZE ? len : sizeof(tx_buf_data);
-        memcpy(tx_buf_data, data, data_len);
-        tx_buf.len = data_len;
-        int ret = spi_write_dt(&spi, &tx);
-        if (ret != 0) 
+        for (size_t i = 0; i < data_len; i++) 
         {
-            LOG_DBG("SPI command transfer failed: %d", ret);
+            // Send one byte at a time, so as not to flood the shift registers of the ePaper.
+            tx_buf_data[0] = *data;
+            tx_buf.len = 1;
+            data++;
+            int ret = spi_write_dt(&spi, &tx);
+            if (ret != 0) 
+            {
+                LOG_DBG("SPI command transfer failed: %d", ret);
+                break;
+            }
+
+            // If the device is busy, wait until it's free. 
+            // The ePaper is very slow, and probably just has shift registers.
+            while (is_busy()) 
+            {
+                k_msleep(1);
+            }
         }
     }
     else 
@@ -174,8 +204,11 @@ parameter:
 static void EPD_4in26_SendCommand(uint8_t Reg)
 {
     LOG_DBG("EPD_4in26_SendCommand: 0x%02X", Reg);
+    CS_INACTIVE();
     SEND_COMMAND();
+    CS_ACTIVE();
     send_n_bytes(&Reg, sizeof(Reg));
+    CS_INACTIVE();
 }
 
 /******************************************************************************
@@ -186,15 +219,21 @@ parameter:
 static void EPD_4in26_SendData(uint8_t Data)
 {
     LOG_DBG("EPD_4in26_SendData: 0x%02X", Data);
+    CS_INACTIVE();
     SEND_DATA();
-    send_n_bytes(&Data, 1);
+    CS_ACTIVE();
+    send_n_bytes(&Data, sizeof(Data));
+    CS_INACTIVE();
 }
 
 static void EPD_4in26_SendData2(uint8_t *pData, size_t len)
 {
     LOG_DBG("EPD_4in26_SendData2: 0x%02X of len: %d", pData[0], len);
+    CS_INACTIVE();
     SEND_DATA();
+    CS_ACTIVE();
     send_n_bytes(pData, len);
+    CS_INACTIVE();
 }
 
 /******************************************************************************
@@ -202,41 +241,40 @@ function :	Wait until the busy_pin goes LOW
 parameter:
 ******************************************************************************/
 #ifndef DISABLE_BUSY_CHECK_FOR_DEBUGGING
-static inline bool is_busy(void)
-{
-    return (gpio_pin_get_dt(&busy_gpio) > INACTIVE_LOGIC);
-}
-
 void EPD_4in26_ReadBusy(void)
 {
-    bool busy_status = is_busy();
-    while(busy_status != 0)
-	{	 //=1 BUSY (ACTIVE HIGH)
-        LOG_DBG("e-Paper busy: %d", busy_status);
-		k_msleep(20);
-        busy_status = is_busy();
+    while(is_busy())
+	{	//=1 BUSY (ACTIVE HIGH)
+        LOG_DBG("e-Paper busy.");
+		k_msleep(50);
 	}
-	k_msleep(20);
-    LOG_DBG("e-Paper busy release: %d", busy_status);
+	k_msleep(50);
+    LOG_DBG("e-Paper not busy.");
 }
 
-void EPD_4in26_ReadBusy_Debug(void)
+void EPD_4in26_ReadBusy_Debug(void) 
 {
-    bool busy_status = is_busy();
-    while(busy_status)
-	{	 //=1 BUSY (ACTIVE HIGH)
-        LOG_DBG("DBG busy: %d", busy_status);
-		k_msleep(1000);
-        busy_status = is_busy();
-	}
-	k_msleep(1000);
-    LOG_DBG("DBG release: %d", busy_status);
+    // UNUSED when production code.
 }
 
 #else
 void EPD_4in26_ReadBusy(void)
 {
     LOG_DBG("e-Paper busy release");
+}
+
+void EPD_4in26_ReadBusy_Debug(void)
+{
+    bool busy_status = is_busy();
+    int pin_value = nrf_gpio_pin_out_read(busy_gpio.pin);
+    while(1)
+	{	 //=1 BUSY (ACTIVE HIGH)
+        LOG_DBG("DBG busy: %d %d", busy_status, pin_value);
+		k_msleep(4000);
+        busy_status = is_busy();
+	}
+	k_msleep(1000);
+    LOG_DBG("DBG release: %d %d", busy_status, pin_value);
 }
 #endif
 
@@ -342,37 +380,44 @@ static void configure_pins_and_power_on(void)
         LOG_ERR("EPAPER SPI not ready");
         return;
     }
-
     
-    gpio_pin_configure_dt(&power_gpio, GPIO_OUTPUT_INACTIVE);
-    if (!device_is_ready(power_gpio.port)) 
+    int err = gpio_pin_configure_dt(&power_gpio, GPIO_OUTPUT_INACTIVE);
+    if (!device_is_ready(power_gpio.port) || (err != 0)) 
     {
         LOG_ERR("EPAPER POWER GPIO not ready");
         return;
     }
     POWER_ON();
 
-    gpio_pin_configure_dt(&reset_gpio, GPIO_OUTPUT_HIGH);
-    if (!device_is_ready(reset_gpio.port)) 
+    err = gpio_pin_configure_dt(&reset_gpio, GPIO_OUTPUT_HIGH);
+    if (!device_is_ready(reset_gpio.port) || (err != 0)) 
     {
         LOG_ERR("EPAPER RESET GPIO not ready");
         return;
     }
     RESET_INACTIVE();
 
-    gpio_pin_configure_dt(&data_cmd_gpio, GPIO_OUTPUT_LOW);
-    if (!device_is_ready(data_cmd_gpio.port)) 
+    err = gpio_pin_configure_dt(&chip_select_gpio, GPIO_OUTPUT_HIGH);
+    if (!device_is_ready(chip_select_gpio.port) || (err != 0)) 
+    {
+        LOG_ERR("EPAPER CHIP SELECT GPIO not ready");
+        return;
+    }
+    CS_INACTIVE();
+
+    err = gpio_pin_configure_dt(&data_cmd_gpio, GPIO_OUTPUT_LOW);
+    if (!device_is_ready(data_cmd_gpio.port) || (err != 0)) 
     {
         LOG_ERR("EPAPER DATA/CMD GPIO not ready");
         return;
     }
-    
-    if (!gpio_is_ready_dt(&busy_gpio)) 
+
+    err = gpio_pin_configure_dt(&busy_gpio, GPIO_INPUT);
+    if (!gpio_is_ready_dt(&busy_gpio) || (err != 0)) 
     {
         LOG_ERR("EPAPER BUSY GPIO not ready");
         return;
     }
-    gpio_pin_configure_dt(&busy_gpio, GPIO_INPUT | GPIO_PULL_DOWN);
 
     LOG_DBG("EPAPER GPIO ready and device is powered on.");
 }
@@ -682,7 +727,6 @@ void EPD_4in26_4GrayDisplay(uint8_t *Image)
 
         }
         EPD_4in26_SendData(temp3);
-        // printf("%x",temp3);
     }
 
     EPD_4in26_SendCommand(0x26u);   //write RAM for black(0)/white (1)
@@ -741,7 +785,6 @@ void EPD_4in26_4GrayDisplay(uint8_t *Image)
             }
         }
         EPD_4in26_SendData(temp3);
-        // printf("%x",temp3);
     }
 
     EPD_4in26_TurnOnDisplay_4GRAY();
@@ -755,6 +798,12 @@ void EPD_4in26_Sleep(void)
 {
 	EPD_4in26_SendCommand(0x10u); //enter deep sleep
 	EPD_4in26_SendData(0x03u); 
-	k_msleep(100);
+	k_msleep(3000);
     POWER_OFF();
+}
+
+void EPD_4in26_RePowerOn(void)
+{
+    POWER_ON();
+    k_msleep(100);
 }

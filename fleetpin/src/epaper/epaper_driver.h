@@ -49,6 +49,7 @@ void EPD_4in26_Display_Fast(uint8_t *Image);
 void EPD_4in26_Display_Part(uint8_t *Image, uint16_t x, uint16_t y, uint16_t w, uint16_t l);
 void EPD_4in26_4GrayDisplay(uint8_t *Image);
 void EPD_4in26_Sleep(void);
+void EPD_4in26_RePowerOn(void);
 void EPD_4in26_ReadBusy_Debug(void);
 
 #endif

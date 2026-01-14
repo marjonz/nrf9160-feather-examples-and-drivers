@@ -19,4 +19,16 @@ int epaper_init(void);
  */
 void epaper_display_test(void);
 
+/**
+ * @brief API used to power the unit off.
+ */
+void epaper_poweroff(void);
+
+/**
+ * @brief API used to power the unit back on after power off.
+ * Must have run epaper_init() prior, and have powered off prior.
+ *
+ */
+void epaper_re_poweron(void);
+
 void epaper_debug_busy(void);

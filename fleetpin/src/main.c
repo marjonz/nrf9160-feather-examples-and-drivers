@@ -189,15 +189,22 @@ void epaper_thr(void *p1, void *p2, void *p3)
     ARG_UNUSED(p2);
     ARG_UNUSED(p3);
 
-    epaper_init();
+    int err = epaper_init();
+    if (err < 0)
+    {
+        LOG_ERR("Failed to init epaper. (err: %i)", err);
+        return err;
+    }
     k_sleep(K_SECONDS(2));
+
+    // ePAPER test display
     epaper_display_test();
 }
 
 /* Define the threads using K_THREAD_DEFINE */
 //K_THREAD_DEFINE(cloud_thread_id, STACK_SIZE, cloud_thr, NULL, NULL, NULL, CLOUD_PRIORITY, 0, 0);
 //K_THREAD_DEFINE(gnss_thread_id, STACK_SIZE, gnss_thr, NULL, NULL, NULL, GNSS_PRIORITY, 0, 0);
-//K_THREAD_DEFINE(epaper_thread_id, STACK_SIZE, epaper_thr, NULL, NULL, NULL, EPAPER_PRIORITY, 0, 0);
+K_THREAD_DEFINE(epaper_thread_id, STACK_SIZE, epaper_thr, NULL, NULL, NULL, EPAPER_PRIORITY, 0, 0);
 
 
 int main(void)
@@ -221,18 +228,7 @@ int main(void)
         return err;
     }
     #endif
-
-    err = epaper_init();
-    if (err < 0)
-    {
-        LOG_ERR("Failed to init epaper. (err: %i)", err);
-        return err;
-    }
-
-    k_sleep(K_SECONDS(1));
-    // epaper_display_test();
-    epaper_debug_busy();
-    
+  
     /* The main thread can also perform work or go to sleep */
     while (1) {
         k_sleep(K_FOREVER); /* Sleep the main thread indefinitely */
