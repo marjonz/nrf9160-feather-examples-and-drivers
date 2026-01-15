@@ -21,6 +21,7 @@ LOG_MODULE_REGISTER(main);
 #include "cloud/cloud.h"
 #include "gnss/gnss.h"
 #include "epaper/epaper.h"
+#include "flash/flash_fs.h"
 
 #define CONFIG_RETRY_DELAY_MINUTES 1
 
@@ -97,6 +98,7 @@ static void on_modem_lib_init(int ret, void *ctx)
 #define CLOUD_PRIORITY 7 
 #define GNSS_PRIORITY  8 
 #define EPAPER_PRIORITY 9
+#define FLASH_FS_PRIORITY 10
 
 /* Thread entry function for the first thread (e.g., blinking an LED) */
 void cloud_thr(void *p1, void *p2, void *p3) 
@@ -180,7 +182,7 @@ void gnss_thr(void *p1, void *p2, void *p3)
     gnss_thread();
 }
 
-/* Thread entry function for the second thread */
+/* Thread entry function for the third thread */
 void epaper_thr(void *p1, void *p2, void *p3) 
 {
     ARG_UNUSED(p1);
@@ -199,11 +201,21 @@ void epaper_thr(void *p1, void *p2, void *p3)
     epaper_display_test();
 }
 
+/* Thread entry function for the fourth thread */
+void flash_fs_thr(void *p1, void *p2, void *p3) 
+{
+    ARG_UNUSED(p1);
+    ARG_UNUSED(p2);
+    ARG_UNUSED(p3);
+
+    flash_fs_init();
+}
+
 /* Define the threads using K_THREAD_DEFINE */
 K_THREAD_DEFINE(cloud_thread_id, STACK_SIZE, cloud_thr, NULL, NULL, NULL, CLOUD_PRIORITY, 0, 0);
 K_THREAD_DEFINE(gnss_thread_id, STACK_SIZE, gnss_thr, NULL, NULL, NULL, GNSS_PRIORITY, 0, 0);
 K_THREAD_DEFINE(epaper_thread_id, STACK_SIZE, epaper_thr, NULL, NULL, NULL, EPAPER_PRIORITY, 0, 0);
-
+K_THREAD_DEFINE(flash_fs_thread_id, STACK_SIZE, flash_fs_thr, NULL, NULL, NULL, FLASH_FS_PRIORITY, 0, 0);
 
 int main(void)
 {

@@ -144,7 +144,7 @@ int flash_fs_init(void)
 {
     LOG_INF("External Flash on %s", CONFIG_BOARD);
 
-	err = nor_storage_init();
+	int err = nor_storage_init();
 	if (err < 0)
 	{
 		LOG_ERR("FAIL: nor_storage_init: %d", err);
