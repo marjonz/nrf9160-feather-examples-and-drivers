@@ -43,6 +43,13 @@ void cloud_cb(struct device_data *p_data)
     LOG_INF("Cloud callback");
 
     /* TODO: handle data here */
+
+    /* Find out how to look for ETag in the p_data response. */
+    // if (headers.find("ETag") != headers.end()) 
+    // {
+    //     LOG_DBG("[APIClient] Last ETag %s\n", headers["ETag"]);
+    //     result.lastETag = headers["ETag"];
+    // }
 }
 
 static void timeout_handler(struct k_timer *timer_id)

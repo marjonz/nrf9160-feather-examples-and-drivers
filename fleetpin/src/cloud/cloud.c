@@ -218,9 +218,22 @@ static void response_cb(struct http_response *rsp,
     LOG_INF("HTTP Status %d", rsp->http_status_code);
 
     /* Check status */
-    if (rsp->http_status_code != 200 && rsp->http_status_code != 201)
+    switch (rsp->http_status_code)
     {
-        return;
+        case 200:
+        case 201:
+            // Good response, continue.
+            break;
+
+        case 304:
+            LOG_DBG("[APIClient] No update available, status code: %d\n", rsp->http_status_code);
+            //result.hasUpdate = false;
+            //result.success = true;
+            break;
+
+        default:
+            LOG_ERR("Unexpected HTTP status code: %d", rsp->http_status_code);
+            return;
     }
 
     if (final_data == HTTP_DATA_FINAL)
