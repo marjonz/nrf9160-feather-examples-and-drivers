@@ -43,7 +43,7 @@ from : https://github.com/waveshareteam/e-Paper/blob/master/RaspberryPi_JetsonNa
 #include <hal/nrf_gpio.h>
 #endif
 
-LOG_MODULE_REGISTER(epaper_driver, LOG_LEVEL_ERR);
+LOG_MODULE_REGISTER(epaper_driver, LOG_LEVEL_WRN);
 
 const unsigned char LUT_DATA_4Gray[112] =    //112bytes
 {											

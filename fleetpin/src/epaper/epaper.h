@@ -44,4 +44,8 @@ void epaper_poweroff(void);
  */
 void epaper_re_poweron(void);
 
+/**
+ * @brief ONLY USED FOR DEBUGGING THE BUSY PIN. DO NOT CALL IN PRODUCTION CODE.
+ *
+ */
 void epaper_debug_busy(void);

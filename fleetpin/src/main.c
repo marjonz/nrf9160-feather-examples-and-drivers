@@ -17,8 +17,6 @@ LOG_MODULE_REGISTER(main);
 #include <modem/nrf_modem_lib.h>
 #include <nrf_modem_at.h>
 
-#include <zephyr/drivers/mfd/npm1300.h>
-
 /* Local */
 #include "cloud/cloud.h"
 #include "gnss/gnss.h"
