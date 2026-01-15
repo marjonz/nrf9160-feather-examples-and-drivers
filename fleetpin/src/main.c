@@ -215,7 +215,7 @@ void flash_fs_thr(void *p1, void *p2, void *p3)
 K_THREAD_DEFINE(cloud_thread_id, STACK_SIZE, cloud_thr, NULL, NULL, NULL, CLOUD_PRIORITY, 0, 0);
 K_THREAD_DEFINE(gnss_thread_id, STACK_SIZE, gnss_thr, NULL, NULL, NULL, GNSS_PRIORITY, 0, 0);
 K_THREAD_DEFINE(epaper_thread_id, STACK_SIZE, epaper_thr, NULL, NULL, NULL, EPAPER_PRIORITY, 0, 0);
-K_THREAD_DEFINE(flash_fs_thread_id, STACK_SIZE, flash_fs_thr, NULL, NULL, NULL, FLASH_FS_PRIORITY, 0, 0);
+K_THREAD_DEFINE(flash_fs_thread_id, (4*STACK_SIZE), flash_fs_thr, NULL, NULL, NULL, FLASH_FS_PRIORITY, 0, 0);
 
 int main(void)
 {
