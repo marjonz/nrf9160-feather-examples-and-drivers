@@ -14,6 +14,19 @@
 int epaper_init(void);
 
 /**
+ * @brief API used to clear the display
+ *
+ */
+void epaper_clear(void);
+
+/**
+ * @brief API used to draw a bitmap image to the display
+ * @param bmp Pointer to the bitmap image data, the size of the bitmap 
+ *          must match the display resolution (i.e. 800x480).
+ */
+void epaper_draw_bitmap(const unsigned char* bmp);
+
+/**
  * @brief API used to display test image
  *
  */

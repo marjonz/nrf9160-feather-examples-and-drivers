@@ -24,7 +24,9 @@
 &spi1 {
     compatible = "nordic,nrf-spim";
     status = "okay";
-	//cs-gpios  = <&gpio0 16 GPIO_ACTIVE_LOW>;
+	// CANNOT USE HW CS, as the epaper's shift register is too slow.
+	// Need to check the busy-gpio after every byte and hold off sending if BUSY.
+	//cs-gpios  = <&gpio0 16 GPIO_ACTIVE_LOW>;  
 	pinctrl-0 = <&spi1_default>;
     pinctrl-1 = <&spi1_sleep>;
     pinctrl-names = "default", "sleep";
