@@ -132,14 +132,16 @@
 			compatible = "nordic,npm1300-regulator";
 
 			npm1300_buck1: BUCK1 {
-				regulator-min-microvolt = <2700000>;
+				regulator-min-microvolt = <3300000>;
 				regulator-max-microvolt = <3300000>;
+				regulator-init-microvolt = <3300000>; /* 3.3V */
 				regulator-always-on;
 			};
 
 			npm1300_buck2: BUCK2 {
 				regulator-min-microvolt = <3300000>;
 				regulator-max-microvolt = <3300000>;
+				regulator-boot-on;
 			};
 
 
