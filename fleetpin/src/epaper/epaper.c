@@ -5,7 +5,7 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(epaper, LOG_LEVEL_DBG);
 
-#define EPAPER_TEST_FLEXWARE_LOGO true
+//#define EPAPER_TEST_FLEXWARE_LOGO true
 #ifdef EPAPER_TEST_FLEXWARE_LOGO
 #include "flexware_logo.h"
 #endif
@@ -20,9 +20,7 @@ int epaper_init(void)
 {
     LOG_DBG("ePaper Initialized");
     EPD_4in26_Init();
-    ///EPD_4in26_Init_4GRAY();
-    EPD_4in26_Clear();
-    //Paint_NewImage(DisplayImage, EPD_4in26_WIDTH, EPD_4in26_HEIGHT, 0, WHITE);
+    Paint_NewImage(DisplayImage, EPD_4in26_WIDTH, EPD_4in26_HEIGHT, 0, WHITE);
     k_msleep(500);
 
     return 0;
@@ -52,7 +50,7 @@ void epaper_draw_bitmap(const unsigned char* bmp)
     LOG_DBG("Draw bitmap image");
     Paint_SelectImage(DisplayImage);
     Paint_SetScale(2);
-    Paint_Clear(BLACK);
+    Paint_Clear(WHITE);
     Paint_DrawBitMap(bmp);
     EPD_4in26_Display(DisplayImage);
 }

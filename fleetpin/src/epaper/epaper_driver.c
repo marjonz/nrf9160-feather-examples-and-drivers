@@ -43,7 +43,7 @@ from : https://github.com/waveshareteam/e-Paper/blob/master/RaspberryPi_JetsonNa
 #include <hal/nrf_gpio.h>
 #endif
 
-LOG_MODULE_REGISTER(epaper_driver, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(epaper_driver, LOG_LEVEL_ERR);
 
 const unsigned char LUT_DATA_4Gray[112] =    //112bytes
 {											
@@ -204,7 +204,6 @@ parameter:
 static void EPD_4in26_SendCommand(uint8_t Reg)
 {
     LOG_DBG("EPD_4in26_SendCommand: 0x%02X", Reg);
-    CS_INACTIVE();
     SEND_COMMAND();
     CS_ACTIVE();
     send_n_bytes(&Reg, sizeof(Reg));
@@ -219,7 +218,6 @@ parameter:
 static void EPD_4in26_SendData(uint8_t Data)
 {
     LOG_DBG("EPD_4in26_SendData: 0x%02X", Data);
-    CS_INACTIVE();
     SEND_DATA();
     CS_ACTIVE();
     send_n_bytes(&Data, sizeof(Data));
@@ -229,7 +227,6 @@ static void EPD_4in26_SendData(uint8_t Data)
 static void EPD_4in26_SendData2(uint8_t *pData, size_t len)
 {
     LOG_DBG("EPD_4in26_SendData2: 0x%02X of len: %d", pData[0], len);
-    CS_INACTIVE();
     SEND_DATA();
     CS_ACTIVE();
     send_n_bytes(pData, len);
