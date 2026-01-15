@@ -15,8 +15,8 @@ int epaper_init(void)
     LOG_DBG("ePaper Initialized");
     EPD_4in26_Init();
     ///EPD_4in26_Init_4GRAY();
-    //EPD_4in26_Clear();
-    Paint_NewImage(DisplayImage, EPD_4in26_WIDTH, EPD_4in26_HEIGHT, 0, WHITE);
+    EPD_4in26_Clear();
+    //Paint_NewImage(DisplayImage, EPD_4in26_WIDTH, EPD_4in26_HEIGHT, 0, WHITE);
     k_msleep(500);
 
     return 0;
@@ -44,7 +44,7 @@ void epaper_re_poweron(void)
 void epaper_draw_bitmap(const unsigned char* bmp) {
     LOG_DBG("Draw bitmap image");
     Paint_SelectImage(DisplayImage);
-    Paint_Clear(WHITE);
+    Paint_Clear(BLACK);
     Paint_DrawBitMap(bmp);
     EPD_4in26_Display(DisplayImage);
 }
@@ -4061,14 +4061,13 @@ void epaper_display_test(void)
 {
     LOG_DBG("ePaper Display Test...");
 
-    #if EPAPER_TEST_FLEXWARE_LOGO
+    #ifdef EPAPER_TEST_FLEXWARE_LOGO
     epaper_draw_bitmap(flexware_logo_800_x_480_v4_bits);
     #endif
 
     #if 0
-    Paint_NewImage(DisplayImage, EPD_4in26_WIDTH, EPD_4in26_HEIGHT, 0, BLACK);
+    Paint_NewImage(DisplayImage, EPD_4in26_WIDTH, EPD_4in26_HEIGHT, 0, WHITE);
     LOG_DBG("Painting new image....");
-    //EPD_4in26_Display_Fast(DisplayImage);
     EPD_4in26_Display_Base(DisplayImage);
     k_msleep(2000);
     #endif

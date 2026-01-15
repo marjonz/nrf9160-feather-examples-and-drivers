@@ -536,8 +536,9 @@ void EPD_4in26_Init_4GRAY(void)
 	EPD_4in26_SendData(0xC3u);
 	EPD_4in26_SendData(0xC0u);
 	EPD_4in26_SendData(0x80u);
+
 	EPD_4in26_SendCommand(0x01u);   //      drive output control    
-	EPD_4in26_SendData((EPD_4in26_WIDTH-1) %256); //  Y  
+	EPD_4in26_SendData((EPD_4in26_WIDTH-1) % 256); //  Y  
 	EPD_4in26_SendData((EPD_4in26_WIDTH-1) / 256); //  Y 
 	EPD_4in26_SendData(0x02u);
 
@@ -546,7 +547,8 @@ void EPD_4in26_Init_4GRAY(void)
 
 	EPD_4in26_SendCommand(0x11u);        //    data  entry  mode
 	EPD_4in26_SendData(0x01u);           //       X-mode  x+ y-    
-	EPD_4in26_SetWindows(0, EPD_4in26_HEIGHT-1, EPD_4in26_WIDTH-1, 0);
+	
+    EPD_4in26_SetWindows(0, EPD_4in26_HEIGHT-1, EPD_4in26_WIDTH-1, 0);
 
 	EPD_4in26_SetCursor(0, 0);
 

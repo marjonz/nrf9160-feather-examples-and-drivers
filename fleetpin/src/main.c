@@ -193,7 +193,7 @@ void epaper_thr(void *p1, void *p2, void *p3)
     if (err < 0)
     {
         LOG_ERR("Failed to init epaper. (err: %i)", err);
-        return err;
+        return;
     }
     k_sleep(K_SECONDS(2));
 
@@ -202,8 +202,8 @@ void epaper_thr(void *p1, void *p2, void *p3)
 }
 
 /* Define the threads using K_THREAD_DEFINE */
-//K_THREAD_DEFINE(cloud_thread_id, STACK_SIZE, cloud_thr, NULL, NULL, NULL, CLOUD_PRIORITY, 0, 0);
-//K_THREAD_DEFINE(gnss_thread_id, STACK_SIZE, gnss_thr, NULL, NULL, NULL, GNSS_PRIORITY, 0, 0);
+K_THREAD_DEFINE(cloud_thread_id, STACK_SIZE, cloud_thr, NULL, NULL, NULL, CLOUD_PRIORITY, 0, 0);
+K_THREAD_DEFINE(gnss_thread_id, STACK_SIZE, gnss_thr, NULL, NULL, NULL, GNSS_PRIORITY, 0, 0);
 K_THREAD_DEFINE(epaper_thread_id, STACK_SIZE, epaper_thr, NULL, NULL, NULL, EPAPER_PRIORITY, 0, 0);
 
 
@@ -213,7 +213,6 @@ int main(void)
 
     LOG_INF("HTTPS Sample. Board: %s", CONFIG_BOARD);
 
-    #if 0
     /* GNSS pre-init functions */
     (void) gnss_pre_init();
 
@@ -227,7 +226,6 @@ int main(void)
         LOG_ERR("Failed to init modem lib. (err: %i)", err);
         return err;
     }
-    #endif
   
     /* The main thread can also perform work or go to sleep */
     while (1) {
