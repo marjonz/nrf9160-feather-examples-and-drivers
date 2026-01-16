@@ -419,13 +419,9 @@ static void configure_pins_and_power_on(void)
     LOG_DBG("EPAPER GPIO ready and device is powered on.");
 }
 
-/******************************************************************************
-function :	Initialize the e-Paper register
-parameter:
-******************************************************************************/
-void EPD_4in26_Init(void)
+static void common_init_steps(void)
 {
-    configure_pins_and_power_on();
+        configure_pins_and_power_on();
 
 	EPD_4in26_Reset();
     LOG_DBG("EPAPER device reset. Init");
@@ -459,48 +455,23 @@ void EPD_4in26_Init(void)
 	EPD_4in26_SetWindows(0, EPD_4in26_HEIGHT-1, EPD_4in26_WIDTH-1, 0);
 
 	EPD_4in26_SetCursor(0, 0);
+}
 
+/******************************************************************************
+function :	Initialize the e-Paper register
+parameter:
+******************************************************************************/
+void EPD_4in26_Init(void)
+{
+    LOG_DBG("EPAPER device reset. Init");
+    common_init_steps();
 	EPD_4in26_ReadBusy();
 }
 
 void EPD_4in26_Init_Fast(void)
 {
-    configure_pins_and_power_on();
-
-	EPD_4in26_Reset();
     LOG_DBG("EPAPER device reset. Init Fast");
-	k_msleep(100);
-
-	EPD_4in26_ReadBusy();   
-	EPD_4in26_SendCommand(0x12u);  //SWRESET
-	EPD_4in26_ReadBusy();   
-	
-	EPD_4in26_SendCommand(0x18u); // use the internal temperature sensor
-	EPD_4in26_SendData(0x80u);
-
-	EPD_4in26_SendCommand(0x0Cu); //set soft start     
-	EPD_4in26_SendData(0xAEu);
-	EPD_4in26_SendData(0xC7u);
-	EPD_4in26_SendData(0xC3u);
-	EPD_4in26_SendData(0xC0u);
-	EPD_4in26_SendData(0x80u);
-
-	EPD_4in26_SendCommand(0x01u);   //      drive output control    
-	EPD_4in26_SendData((EPD_4in26_HEIGHT-1) % 256); //  Y  
-	EPD_4in26_SendData((EPD_4in26_HEIGHT-1) / 256); //  Y 
-	EPD_4in26_SendData(0x02u);
-
-	EPD_4in26_SendCommand(0x3Cu);        // Border       Border setting 
-	EPD_4in26_SendData(0x01u);
-
-	EPD_4in26_SendCommand(0x11u);        //    data  entry  mode
-	EPD_4in26_SendData(0x01u);           //       X-mode  x+ y-    
-
-	EPD_4in26_SetWindows(0, EPD_4in26_HEIGHT-1, EPD_4in26_WIDTH-1, 0);
-
-	EPD_4in26_SetCursor(0, 0);
-
-	EPD_4in26_ReadBusy();
+    common_init_steps();
 
 	//TEMP (1.5s)
 	EPD_4in26_SendCommand(0x1Au);  
