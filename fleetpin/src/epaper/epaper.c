@@ -6,8 +6,13 @@
 LOG_MODULE_REGISTER(epaper, LOG_LEVEL_DBG);
 
 //#define EPAPER_TEST_FLEXWARE_LOGO true
+//#define DISPLAY_FLEETPIN_SAMPLE_IMAGE true
+
 #ifdef EPAPER_TEST_FLEXWARE_LOGO
 #include "flexware_logo.h"
+#endif
+#ifdef DISPLAY_FLEETPIN_SAMPLE_IMAGE
+#include "fleetpin_sample.h"
 #endif
 
 // Declare a static image buffer for the ePaper display
@@ -64,6 +69,11 @@ void epaper_display_test(void)
 
     #ifdef EPAPER_TEST_FLEXWARE_LOGO
     epaper_draw_bitmap(flexware_logo_800_x_480_v4_bits);
+    k_msleep(2000);
+    #endif
+
+    #ifdef DISPLAY_FLEETPIN_SAMPLE_IMAGE
+    epaper_draw_bitmap(gImage_4in26);
     k_msleep(2000);
     #endif
 
