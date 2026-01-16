@@ -20,6 +20,7 @@ LOG_MODULE_REGISTER(main);
 /* Local */
 #include "cloud/cloud.h"
 #include "gnss/gnss.h"
+#include "epaper/epaper.h"
 
 #define CONFIG_RETRY_DELAY_MINUTES 1
 
@@ -92,9 +93,11 @@ static void on_modem_lib_init(int ret, void *ctx)
 
 /* Define the stack sizes for the threads */
 #define STACK_SIZE 512
+#define EPAPER_THREAD_STACK_SIZE 4096
 /* Define thread priorities (lower number = higher priority) */
 #define CLOUD_PRIORITY 7 
 #define GNSS_PRIORITY  8 
+#define EPAPER_PRIORITY 9
 
 /* Thread entry function for the first thread (e.g., blinking an LED) */
 void cloud_thr(void *p1, void *p2, void *p3) 
@@ -178,33 +181,51 @@ void gnss_thr(void *p1, void *p2, void *p3)
     gnss_thread();
 }
 
+/* Thread entry function for the second thread */
+void epaper_thr(void *p1, void *p2, void *p3) 
+{
+    ARG_UNUSED(p1);
+    ARG_UNUSED(p2);
+    ARG_UNUSED(p3);
+
+    int err = epaper_init();
+    if (err < 0)
+    {
+        LOG_ERR("Failed to init epaper. (err: %i)", err);
+        return;
+    }
+    k_sleep(K_SECONDS(1));
+
+    // ePAPER test display
+    epaper_display_test();
+}
+
 /* Define the threads using K_THREAD_DEFINE */
 K_THREAD_DEFINE(cloud_thread_id, STACK_SIZE, cloud_thr, NULL, NULL, NULL, CLOUD_PRIORITY, 0, 0);
 K_THREAD_DEFINE(gnss_thread_id, STACK_SIZE, gnss_thr, NULL, NULL, NULL, GNSS_PRIORITY, 0, 0);
-
+K_THREAD_DEFINE(epaper_thread_id, EPAPER_THREAD_STACK_SIZE, epaper_thr, NULL, NULL, NULL, EPAPER_PRIORITY, 0, 0);
 
 int main(void)
 {
-    int err;
+    LOG_INF("Fleetpin Project. Board: %s", CONFIG_BOARD);
 
-    LOG_INF("HTTPS Sample. Board: %s", CONFIG_BOARD);
-
-    /* GNSS pre-init functions */
+    // /* GNSS pre-init functions */
     (void) gnss_pre_init();
 
     /* Register callback handler to handler LTE events */
     lte_lc_register_handler(lte_handler);
 
     /* Init modem lib */
-    err = nrf_modem_lib_init();
+    int err = nrf_modem_lib_init();
     if (err < 0)
     {
         LOG_ERR("Failed to init modem lib. (err: %i)", err);
         return err;
     }
-
+  
     /* The main thread can also perform work or go to sleep */
-    while (1) {
+    while (1) 
+    {
         k_sleep(K_FOREVER); /* Sleep the main thread indefinitely */
     }
 }
