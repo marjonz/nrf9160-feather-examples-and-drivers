@@ -421,7 +421,7 @@ static void configure_pins_and_power_on(void)
 
 static void common_init_steps(void)
 {
-        configure_pins_and_power_on();
+    configure_pins_and_power_on();
 
 	EPD_4in26_Reset();
     LOG_DBG("EPAPER device reset. Init");

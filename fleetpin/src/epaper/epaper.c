@@ -73,14 +73,6 @@ void epaper_display_test(void)
     #endif
 
     #ifdef DISPLAY_FLEETPIN_SAMPLE_IMAGE
-    // EPD_4in26_Init_Fast();
-    // // EPD_4in26_Init();
-    // Paint_NewImage(DisplayImage, EPD_4in26_WIDTH, EPD_4in26_HEIGHT, 0, WHITE);
-    // Paint_SelectImage(DisplayImage);
-    // Paint_Clear(WHITE);
-    // Paint_DrawBitMap(gImage_4in26);
-    // EPD_4in26_Display_Fast(DisplayImage);
-    // // EPD_4in26_Display(DisplayImage);
     epaper_draw_bitmap(gImage_4in26);
     k_msleep(2000);
     #endif
