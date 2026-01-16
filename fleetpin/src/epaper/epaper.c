@@ -6,7 +6,7 @@
 LOG_MODULE_REGISTER(epaper, LOG_LEVEL_DBG);
 
 //#define EPAPER_TEST_FLEXWARE_LOGO true
-#define DISPLAY_FLEETPIN_SAMPLE_IMAGE true
+//#define DISPLAY_FLEETPIN_SAMPLE_IMAGE true
 
 #ifdef EPAPER_TEST_FLEXWARE_LOGO
 #include "flexware_logo.h"
