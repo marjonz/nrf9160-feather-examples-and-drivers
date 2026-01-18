@@ -91,7 +91,7 @@ static void on_modem_lib_init(int ret, void *ctx)
 #endif
 
 /* Define the stack sizes for the threads */
-#define STACK_SIZE 512
+#define STACK_SIZE 1024
 /* Define thread priorities (lower number = higher priority) */
 #define CLOUD_PRIORITY 7 
 #define GNSS_PRIORITY  8 
@@ -190,8 +190,8 @@ void gnss_thr(void *p1, void *p2, void *p3)
 }
 
 /* Define the threads using K_THREAD_DEFINE */
-K_THREAD_DEFINE(cloud_thread_id, STACK_SIZE, cloud_thr, NULL, NULL, NULL, CLOUD_PRIORITY, 0, 0);
-K_THREAD_DEFINE(gnss_thread_id, STACK_SIZE, gnss_thr, NULL, NULL, NULL, GNSS_PRIORITY, 0, 0);
+K_THREAD_DEFINE(cloud_thread_id, (2*STACK_SIZE), cloud_thr, NULL, NULL, NULL, CLOUD_PRIORITY, 0, 0);
+K_THREAD_DEFINE(gnss_thread_id, (2*STACK_SIZE), gnss_thr, NULL, NULL, NULL, GNSS_PRIORITY, 0, 0);
 
 
 int main(void)
