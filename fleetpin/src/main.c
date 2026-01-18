@@ -112,7 +112,7 @@ void cloud_thr(void *p1, void *p2, void *p3)
     if (err < 0)
     {
         LOG_ERR("Failed to init modem lib. (err: %i)", err);
-        return err;
+        return;
     }
 
     /* Cloud init */
@@ -196,8 +196,6 @@ K_THREAD_DEFINE(gnss_thread_id, STACK_SIZE, gnss_thr, NULL, NULL, NULL, GNSS_PRI
 
 int main(void)
 {
-    int err;
-
     LOG_INF("HTTPS Sample. Board: %s", CONFIG_BOARD);
 
     /* GNSS pre-init functions */
