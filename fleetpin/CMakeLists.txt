@@ -6,9 +6,25 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(fleetpin)
 
 target_sources(app PRIVATE src/main.c)
-target_sources(app PRIVATE src/cloud/cloud.c)
-target_sources(app PRIVATE src/gnss/gnss.c)
 
+# LTE Cloud files
+target_sources(app PRIVATE src/cloud/cloud.c)
+
+# Waveshare epaper files
+target_sources(app PRIVATE src/epaper/epaper_driver.c)
+target_sources(app PRIVATE src/epaper/epaper.c)
+target_sources(app PRIVATE src/epaper/GUI_Paint.c)
+target_sources(app PRIVATE src/epaper/Fonts/font8.c)
+target_sources(app PRIVATE src/epaper/Fonts/font12.c)
+target_sources(app PRIVATE src/epaper/Fonts/font16.c)
+target_sources(app PRIVATE src/epaper/Fonts/font20.c)
+target_sources(app PRIVATE src/epaper/Fonts/font24.c)
+
+# Flash filesystem
+target_sources(app PRIVATE src/flash/flash_fs.c)
+
+# GPS/GNSS files (needs LTE driver too)
+target_sources(app PRIVATE src/gnss/gnss.c)
 zephyr_library_sources_ifdef(CONFIG_GNSS_SAMPLE_ASSISTANCE_NRF_CLOUD ${NRF_DIR}/samples/cellular/gnss/src/assistance.c)
 zephyr_library_sources_ifdef(CONFIG_GNSS_SAMPLE_ASSISTANCE_SUPL ${NRF_DIR}/samples/cellular/gnss/src/assistance_supl.c)
 zephyr_library_sources_ifdef(CONFIG_GNSS_SAMPLE_ASSISTANCE_MINIMAL ${NRF_DIR}/samples/cellular/gnss/src/assistance_minimal.c)
