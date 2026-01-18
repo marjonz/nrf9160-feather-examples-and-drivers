@@ -103,9 +103,20 @@ void cloud_thr(void *p1, void *p2, void *p3)
     ARG_UNUSED(p1);
     ARG_UNUSED(p2);
     ARG_UNUSED(p3);
+    
+    /* Register callback handler to handler LTE events */
+    lte_lc_register_handler(lte_handler);
+
+    /* Init modem lib */
+    int err = nrf_modem_lib_init();
+    if (err < 0)
+    {
+        LOG_ERR("Failed to init modem lib. (err: %i)", err);
+        return err;
+    }
 
     /* Cloud init */
-    int err = cloud_init(cloud_cb);
+    err = cloud_init(cloud_cb);
     if (err < 0)
     {
         LOG_ERR("Unable to set callback. Err: %i", err);
@@ -191,17 +202,6 @@ int main(void)
 
     /* GNSS pre-init functions */
     (void) gnss_pre_init();
-
-    /* Register callback handler to handler LTE events */
-    lte_lc_register_handler(lte_handler);
-
-    /* Init modem lib */
-    err = nrf_modem_lib_init();
-    if (err < 0)
-    {
-        LOG_ERR("Failed to init modem lib. (err: %i)", err);
-        return err;
-    }
 
     /* The main thread can also perform work or go to sleep */
     while (1) {

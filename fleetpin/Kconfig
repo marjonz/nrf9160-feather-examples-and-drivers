@@ -1,9 +1,13 @@
-mainmenu "Application Configuration"
+menu "Application Configuration"
+
+source "Kconfig.zephyr"
 
 config DEFAULT_DELAY
     int "Update interval (minutes)"
     default 2
-
+    
 rsource "src/cloud/Kconfig.cloud"
 
 rsource "src/gnss/Kconfig.gnss"
+
+endmenu
