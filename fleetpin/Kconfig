@@ -10,4 +10,6 @@ rsource "src/cloud/Kconfig.cloud"
 
 rsource "src/gnss/Kconfig.gnss"
 
+rsource "src/flash/Kconfig.flash"
+
 endmenu

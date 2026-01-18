@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # https://github.com/circuitdojo/nrf9160-feather-examples-and-drivers/blob/7e1a44fd8569e15f14aab56117317359d664eff5/samples/external_flash/Kconfig
 
-mainmenu "littlefs sample"
+# mainmenu "littlefs sample"
 
 config APP_WIPE_STORAGE
 	bool "Option to clear the flash area before mounting"
