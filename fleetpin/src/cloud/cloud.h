@@ -7,19 +7,23 @@
 #ifndef _CLOUD_H
 #define _CLOUD_H
 
+#include "apiclient.h"
+
 struct device_data
 {
     bool do_something;
 };
 
+typedef void (*cloud_callback_t)(const apic_reponse_data_t data, const struct http_response *rsp);
+
 /**
  * @brief Publish data to the cloud
  *
- * @param data Pointer to device data
+ * @param data Pointer to device CJSON data
  * @return int 0 if successful, negative errno otherwise
  *
  */
-int cloud_publish(struct device_data *data);
+int cloud_publish_cjson(struct device_data *data);
 
 /**
  * @brief Initialize the cloud
@@ -28,6 +32,6 @@ int cloud_publish(struct device_data *data);
  * @return int 0 if successful, negative errno otherwise
  *
  */
-int cloud_init(void (*callback)(struct device_data *data));
+int cloud_init(cloud_callback_t callback);
 
 #endif

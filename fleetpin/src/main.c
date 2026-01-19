@@ -18,6 +18,7 @@ LOG_MODULE_REGISTER(main);
 #include <nrf_modem_at.h>
 
 /* Local */
+#include "cloud/apiclient.h"
 #include "cloud/cloud.h"
 #include "gnss/gnss.h"
 #include "epaper/epaper.h"
@@ -32,24 +33,19 @@ K_TIMER_DEFINE(timer, timeout_handler, NULL);
 /* Thread control */
 K_SEM_DEFINE(thread_sem, 0, 1);
 K_SEM_DEFINE(lte_connected, 0, 1);
+K_SEM_DEFINE(gnss_sem, 0, 1);
 
 /* Variables */
 static struct device_data data = {
     .do_something = true,
 };
 
-void cloud_cb(struct device_data *p_data)
+void cloud_cb(const apic_reponse_data_t p_data, const struct http_response *rsp)
 {
     LOG_INF("Cloud callback");
 
     /* TODO: handle data here */
-
-    /* Find out how to look for ETag in the p_data response. */
-    // if (headers.find("ETag") != headers.end()) 
-    // {
-    //     LOG_DBG("[APIClient] Last ETag %s\n", headers["ETag"]);
-    //     result.lastETag = headers["ETag"];
-    // }
+    apic_request_update(p_data, rsp);
 }
 
 static void timeout_handler(struct k_timer *timer_id)
@@ -156,14 +152,9 @@ void cloud_thr(void *p1, void *p2, void *p3)
 	k_sleep(K_SECONDS(1));
 
     LOG_INF("Safe to use sockets now. LTE is connected.");
-    
-    /* Initialize GNSS module*/
-    err = gnss_init();
-    if (err < 0)
-    {
-        LOG_ERR("Failed to initialize GNSS. Err: %i", err);
-        return;
-    }
+
+    // Modem is ready, tell the GNSS/GPS thread
+    k_sem_give(&gnss_sem);
 
     /* Start timer to periodically wake the device and publish data */
     k_timer_start(&timer, K_MINUTES(CONFIG_DEFAULT_DELAY), K_MINUTES(CONFIG_DEFAULT_DELAY));
@@ -176,7 +167,7 @@ void cloud_thr(void *p1, void *p2, void *p3)
         k_sem_take(&thread_sem, K_FOREVER);
 
         /* Publish and sleep .. */
-        err = cloud_publish(&data);
+        err = cloud_publish_cjson(&data);
         if (err < 0)
         {
             LOG_ERR("Unable to publish. Err: %i", err);
@@ -200,6 +191,18 @@ void gnss_thr(void *p1, void *p2, void *p3)
     ARG_UNUSED(p1);
     ARG_UNUSED(p2);
     ARG_UNUSED(p3);
+
+    // Wait until the modem is ready
+    k_sem_take(&gnss_sem, K_FOREVER);
+
+    /* Initialize GNSS module*/
+    int err = gnss_init();
+    if (err < 0)
+    {
+        LOG_ERR("Failed to initialize GNSS. Err: %i", err);
+        return;
+    }
+
 
     gnss_thread();
 }

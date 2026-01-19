@@ -10,7 +10,6 @@
 #include <zephyr/net/net_ip.h>
 #include <zephyr/net/socket.h>
 #include <zephyr/net/tls_credentials.h>
-#include <zephyr/net/http/client.h>
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(cloud);
 
@@ -24,12 +23,17 @@ static const char cert[] = {
 #include "isrg-root-x1.pem"
 };
 
+#define NRF_SOCKET_TLS_MAX_MESSAGE_SIZE 2048
+#define SLM_MAX_MESSAGE_SIZE            NRF_SOCKET_TLS_MAX_MESSAGE_SIZE
+#define HTTPC_BUF_LEN		            SLM_MAX_MESSAGE_SIZE
+static uint8_t slm_data_buf[SLM_MAX_MESSAGE_SIZE];  /* For socket data. */
+
 /* Variables */
 const int32_t timeout = 5 * MSEC_PER_SEC;
 #define SOCKET_TIMEOUT_SEC  8
 
 /* Callback */
-static void (*cloud_callback)(struct device_data *data);
+static cloud_callback_t cloud_callback = NULL;
 
 /* Setup TLS options on a given socket */
 int tls_setup(int fd)
@@ -254,11 +258,62 @@ static void response_cb(struct http_response *rsp,
 
         /* Callback */
         if (cloud_callback != NULL)
-            cloud_callback(&data);
+        {
+            cloud_callback(user_data, rsp);
+        }
     }
 }
 
-int cloud_publish(struct device_data *data)
+int cloud_get_config(void)
+{
+    /* Setup socket */
+    int fd = socket_setup();
+    if (fd < 0)
+    {
+        LOG_ERR("Unable to setup socket. Err: %i", fd);
+        return fd;
+    }
+
+    LOG_INF("Socket setup complete");
+
+    /* POST */
+    struct http_request req;
+
+    memset(&req, 0, sizeof(req));
+
+    /* Don't keep connection open.. */
+    char *const headers[] = {
+        "Connection: close\r\n",
+        NULL};
+
+    req.method = HTTP_GET;
+    req.url = "/configuration?device=1&auth=false";
+    req.host = "http://fota.fleetpin.com:3000/";
+    req.protocol = "HTTP/1.1";
+    req.recv_buf = slm_data_buf;
+    req.recv_buf_len = sizeof(slm_data_buf);
+    req.response = response_cb;
+    // req.content_type_value = "application/json";
+    req.header_fields = (const char **)headers;
+
+    int ret = http_client_req(fd, &req, timeout, NULL);
+    if (ret < 0)
+    {
+        LOG_ERR("Unable to send data to cloud. Err: %i", ret);
+    }
+    else
+    {
+        LOG_INF("Data sent to cloud successfully");
+    }
+
+    if (fd)
+    {
+        /* Close connection */
+        (void)close(fd);
+    }
+}
+
+int cloud_publish_cjson(struct device_data *data)
 {
     int fd = -1;
     int ret = 0;
@@ -388,7 +443,7 @@ int cert_provision(void)
     return 0;
 }
 
-int cloud_init(void (*callback)(struct device_data *data))
+int cloud_init(cloud_callback_t callback)
 {
     int err;
 
