@@ -1,5 +1,3 @@
-mainmenu "Application Cloud Configuration"
-
 config CLOUD_TLS_SEC_TAG
     int "TLS Sec Tag"
     default 42
