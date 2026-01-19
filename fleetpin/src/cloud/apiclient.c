@@ -1,10 +1,24 @@
 #include "apiclient.h"
 
 #include <stdio.h>
+#include <string.h>
 
 #define MAX_HEADER_LEN      50
 #define MAX_NUM_HEADERS     10
-static char * headers[MAX_NUM_HEADERS][MAX_HEADER_LEN] = {0};
+
+// String nonce = String(millis());
+// String message = cfg->getDeviceId() + ":" + nonce + ":" + cfg->getAPILastETag() + ":" + nonce;
+const char * nonce = "1234";
+const char * device_id = "1";
+const char * message = "1 : 1234 : W/\"4d-gBCcUSSHqLZELfG9QkjI/6bogiE\" : 1234";
+static char headers[][MAX_HEADER_LEN] = 
+{
+    "User-Agent : Fleetpin EPD Client/1.0",
+    "X-Nonce : 1234",
+    "X-Device-ID: 1",
+    "X-Signature : blah", // HMAC encryted signature 
+    "If-None-Match :  W/\"4d-gBCcUSSHqLZELfG9QkjI/6bogiE\"",
+};
 
 #if 0
 const char * read_all_headers(const struct device_data *p_data) 
@@ -35,10 +49,18 @@ api_client_update_result_t apic_request_update(const apic_reponse_data_t p_data,
     //     result.lastETag = headers["ETag"];
     // }
     uint16_t i = 0u;
-    while (*p_data != NULL)
+    char * data_ptr = (char *)p_data;
+    memset(headers, 0, sizeof(headers));
+    memcpy((char *)&headers[0][0], (char *)data_ptr, MAX_HEADER_LEN);
+
+    // Look at what the response looks like.
+    while (data_ptr != NULL)
     {
-        printf("[%d]%s",i,*p_data[i]);
+        printf("[%d]: %s", i, &headers[0][0]);
+        data_ptr += MAX_HEADER_LEN;
         i++;
+        memset(headers, 0, sizeof(headers));
+        memcpy((char *)&headers[0][0], (char *)data_ptr, MAX_HEADER_LEN);
     }
 
     return result;

@@ -18,7 +18,8 @@
 #include <modem/nrf_modem_lib.h>
 #include <date_time.h>
 
-LOG_MODULE_REGISTER(gnss_sample, CONFIG_GNSS_SAMPLE_LOG_LEVEL);
+// LOG_MODULE_REGISTER(gnss_sample, CONFIG_GNSS_SAMPLE_LOG_LEVEL);
+LOG_MODULE_REGISTER(gnss_sample);
 
 #define PI 3.14159265358979323846
 #define EARTH_RADIUS_METERS (6371.0 * 1000.0)

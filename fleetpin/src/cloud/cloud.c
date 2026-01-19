@@ -214,6 +214,121 @@ clean_up:
         return fd;
 }
 
+static int socket_setup_non_tls()
+{
+    int fd = -1;
+    int err = 0;
+    struct addrinfo *res = NULL;
+
+    /* Hints */
+    struct addrinfo hints =
+    {
+        .ai_family = AF_INET,
+        .ai_socktype = SOCK_STREAM,
+    };
+
+    LOG_INF("Looking up %s", CONFIG_CLOUD_HOSTNAME);
+    err = getaddrinfo(CONFIG_CLOUD_HOSTNAME, NULL, &hints, &res);
+    if (err)
+    {
+        LOG_ERR("getaddrinfo() failed. Err: %i", errno);
+        return err;
+    }
+    else
+    {
+        LOG_INF("getaddrinfo() successful.");
+    }
+
+    ((struct sockaddr_in *)res->ai_addr)->sin_port = htons(CONFIG_CLOUD_PORT);
+
+    /* Create it */
+    fd = socket(res->ai_family, SOCK_STREAM, 0);
+    if (fd == -1)
+    {
+        LOG_ERR("Failed to open socket!");
+        err = -ECONNABORTED;
+        goto clean_up2;
+    }
+    else
+    {
+        LOG_INF("Socket created.");
+    }
+
+    struct timeval recv_timeout = {
+        .tv_sec = SOCKET_TIMEOUT_SEC};
+
+    err = setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &recv_timeout, sizeof(recv_timeout));
+    if (err != 0)
+    {
+        err = -errno;
+        LOG_ERR("Set receive timeout failed, error: %d, errno: %d", err, errno);
+        goto clean_up2;
+    }
+    else
+    {
+        LOG_INF("Socket options set.");
+    }    
+
+    struct timeval send_timeout = {
+        .tv_sec = SOCKET_TIMEOUT_SEC};
+
+    err = setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &send_timeout, sizeof(send_timeout));
+    if (err)
+    {
+        err = -errno;
+        LOG_ERR("Set transmit timeout failed, error: %d, errno: %d", err, errno);
+        goto clean_up2;
+    }
+    else
+    {
+        LOG_INF("Socket TX successful.");
+    } 
+
+    // /* Setup TLS socket options */
+    // err = tls_setup(fd);
+    // if (err < 0)
+    // {
+    //     LOG_ERR("Unable to setup TLS. Err: %i", err);
+    //     goto clean_up;
+    // }
+    // else
+    // {
+    //     LOG_INF("TLS setup complete.");
+    // } 
+
+    /* Connect */
+    err = connect(fd, res->ai_addr, sizeof(struct sockaddr_in));
+    if (err < 0)
+    {
+        err = -errno;
+        LOG_ERR("Unable to connect. Err: %i - %s", err, strerror(errno));
+    }
+    else
+    {
+        LOG_INF("Connected!");
+    }
+
+clean_up2:
+    if (res != NULL)
+    {
+        LOG_INF("Free addr info");
+        freeaddrinfo(res);
+        res = NULL;
+    }
+
+    if (err < 0 && fd >= 0)
+    {
+        close(fd);
+        fd = -1;
+    }
+
+    /* Return error or socket */
+    if (err < 0)
+        return err;
+    else
+        return fd;
+}
+
 static void response_cb(struct http_response *rsp,
                         enum http_final_call final_data,
                         void *user_data)
@@ -267,7 +382,7 @@ static void response_cb(struct http_response *rsp,
 int cloud_get_config(void)
 {
     /* Setup socket */
-    int fd = socket_setup();
+    int fd = socket_setup_non_tls();
     if (fd < 0)
     {
         LOG_ERR("Unable to setup socket. Err: %i", fd);
@@ -283,17 +398,24 @@ int cloud_get_config(void)
 
     /* Don't keep connection open.. */
     char *const headers[] = {
+        "User-Agent : Fleetpin EPD Client/1.0",
+        "X-Nonce : 1234",
+        "X-Device-ID: 1",
+        "X-Signature : blah", // HMAC encryted signature 
+        "If-None-Match :  W/\"4d-gBCcUSSHqLZELfG9QkjI/6bogiE\"",        
         "Connection: close\r\n",
         NULL};
 
     req.method = HTTP_GET;
-    req.url = "/configuration?device=1&auth=false";
-    req.host = "http://fota.fleetpin.com:3000/";
+    // req.url = "/configuration?device=1&auth=false";
+    // req.host = "http://fota.fleetpin.com:3000/";
+    req.url = CONFIG_CLOUD_PUBLISH_PATH;
+    req.host = CONFIG_CLOUD_HOSTNAME;
     req.protocol = "HTTP/1.1";
     req.recv_buf = slm_data_buf;
     req.recv_buf_len = sizeof(slm_data_buf);
     req.response = response_cb;
-    // req.content_type_value = "application/json";
+    req.content_type_value = "application/json";
     req.header_fields = (const char **)headers;
 
     int ret = http_client_req(fd, &req, timeout, NULL);

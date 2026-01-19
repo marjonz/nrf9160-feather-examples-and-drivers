@@ -167,7 +167,8 @@ void cloud_thr(void *p1, void *p2, void *p3)
         k_sem_take(&thread_sem, K_FOREVER);
 
         /* Publish and sleep .. */
-        err = cloud_publish_cjson(&data);
+        //err = cloud_publish_cjson(&data);
+        err = cloud_get_config();
         if (err < 0)
         {
             LOG_ERR("Unable to publish. Err: %i", err);

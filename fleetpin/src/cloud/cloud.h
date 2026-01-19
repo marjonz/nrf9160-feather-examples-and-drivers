@@ -25,6 +25,8 @@ typedef void (*cloud_callback_t)(const apic_reponse_data_t data, const struct ht
  */
 int cloud_publish_cjson(struct device_data *data);
 
+int cloud_get_config(void);
+
 /**
  * @brief Initialize the cloud
  *
