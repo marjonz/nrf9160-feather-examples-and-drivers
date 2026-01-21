@@ -32,6 +32,7 @@ K_TIMER_DEFINE(timer, timeout_handler, NULL);
 /* Thread control */
 K_SEM_DEFINE(thread_sem, 0, 1);
 K_SEM_DEFINE(lte_connected, 0, 1);
+K_SEM_DEFINE(gnss_sem, 0, 1);
 
 /* Variables */
 static struct device_data data = {
@@ -149,14 +150,9 @@ void cloud_thr(void *p1, void *p2, void *p3)
 	k_sleep(K_SECONDS(1));
 
     LOG_INF("Safe to use sockets now. LTE is connected.");
-    
-    /* Initialize GNSS module*/
-    err = gnss_init();
-    if (err < 0)
-    {
-        LOG_ERR("Failed to initialize GNSS. Err: %i", err);
-        return;
-    }
+
+    // Modem is ready, tell the GNSS/GPS thread
+    k_sem_give(&gnss_sem);
 
     /* Start timer to periodically wake the device and publish data */
     k_timer_start(&timer, K_MINUTES(CONFIG_DEFAULT_DELAY), K_MINUTES(CONFIG_DEFAULT_DELAY));
@@ -193,6 +189,18 @@ void gnss_thr(void *p1, void *p2, void *p3)
     ARG_UNUSED(p1);
     ARG_UNUSED(p2);
     ARG_UNUSED(p3);
+
+    // Wait until the modem is ready
+    k_sem_take(&gnss_sem, K_FOREVER);
+
+    /* Initialize GNSS module*/
+    int err = gnss_init();
+    if (err < 0)
+    {
+        LOG_ERR("Failed to initialize GNSS. Err: %i", err);
+        return;
+    }
+
 
     gnss_thread();
 }
