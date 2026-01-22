@@ -35,6 +35,15 @@ K_SEM_DEFINE(lte_connected, 0, 1);
 K_SEM_DEFINE(gnss_sem, 0, 1);
 
 /* Variables */
+// Declare a static image buffer for the ePaper display
+// Each byte represents 8 horizontal pixels.
+#define MAX_WIDTH   800u
+#define MAX_HEIGHT  480u
+#define MAX_IMAGE_SIZE ((MAX_WIDTH/8u) * MAX_HEIGHT)
+//Create a new image cache
+static uint8_t DisplayImage[MAX_IMAGE_SIZE] = {0};
+static size_t current_display_image_index = 0u;
+
 static struct device_data data = {
     .do_something = true,
 };
@@ -92,6 +101,32 @@ static void on_modem_lib_init(int ret, void *ctx)
     }
 }
 #endif
+
+static void push_http_bmp_into_epaper_buffer(bool is_first_chunk_of_data, 
+    const uint8_t * const http_bmp_data, size_t http_data_len)
+{
+    if (is_first_chunk_of_data)
+    {
+        current_display_image_index = 0u;
+    }
+
+    int status = epaper_store_data_to_buffer(DisplayImage, current_display_image_index, sizeof(DisplayImage), 
+        http_bmp_data, http_data_len);
+    if (status == -EDOM || status == -EINVAL)
+    {
+        LOG_ERR("Failed to store http bmp data.");
+    }
+    current_display_image_index = status;
+}
+
+static void store_epaper_buffer_to_file(const char * filename, const uint8_t * const epaper_buffer)
+{
+    int result = flash_fs_write_file_to_fs("this_filename_001", DisplayImage, sizeof(DisplayImage));
+    if (result != 0)
+    {
+        LOG_ERR("Failed to write epaper bitmap to file.");
+    }
+}
 
 /* Define the stack sizes for the threads */
 #define STACK_SIZE                  1024
@@ -212,7 +247,7 @@ void epaper_thr(void *p1, void *p2, void *p3)
     ARG_UNUSED(p2);
     ARG_UNUSED(p3);
 
-    int err = epaper_init();
+    int err = epaper_init(DisplayImage);
     if (err < 0)
     {
         LOG_ERR("Failed to init epaper. (err: %i)", err);

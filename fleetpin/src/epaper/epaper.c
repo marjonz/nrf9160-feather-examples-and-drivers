@@ -19,17 +19,16 @@ LOG_MODULE_REGISTER(epaper, LOG_LEVEL_DBG);
 #include "label.h"
 #endif
 
-// Declare a static image buffer for the ePaper display
-// Each byte represents 8 horizontal pixels.
-#define MAX_IMAGE_SIZE ((EPD_4in26_WIDTH/8u) * EPD_4in26_HEIGHT)
-//Create a new image cache
-static uint8_t DisplayImage[MAX_IMAGE_SIZE] = {0};
-
-int epaper_init(void)
+int epaper_init(uint8_t * const image_buffer)
 {
+    if (image_buffer == NULL)
+    {
+        return -1;
+    }
+
     LOG_DBG("ePaper Initialized");
     EPD_4in26_Init();
-    Paint_NewImage(DisplayImage, EPD_4in26_WIDTH, EPD_4in26_HEIGHT, 0, WHITE);
+    Paint_NewImage(image_buffer, EPD_4in26_WIDTH, EPD_4in26_HEIGHT, 0, WHITE);
     k_msleep(500);
 
     return 0;
@@ -54,14 +53,45 @@ void epaper_re_poweron(void)
     EPD_4in26_RePowerOn();
 }
 
-void epaper_draw_bitmap(const unsigned char* bmp) 
+int epaper_store_data_to_buffer(uint8_t * const image_buffer, size_t current_buffer_index, 
+    size_t max_image_buffer_size, const uint8_t * const current_data_ptr, size_t current_data_len)
+{
+    if (image_buffer == NULL || current_data_ptr == NULL)
+    {
+        return -EINVAL;
+    }
+
+    if (current_buffer_index + current_data_len > max_image_buffer_size)
+    {
+        return -EDOM;
+    }
+
+    memcpy(&image_buffer[current_buffer_index], current_data_ptr, current_data_len);
+    size_t total_bytes_in_buffer = current_buffer_index + current_data_len;
+    return (int) total_bytes_in_buffer;
+}
+
+void epaper_draw_current_image_buffer(uint8_t * const image_buffer)
+{
+    if (image_buffer != NULL)
+    {
+        LOG_DBG("Drawing bitmap image from buffer");
+        Paint_SelectImage(image_buffer);
+        Paint_SetScale(2);
+        Paint_Clear(WHITE);
+        EPD_4in26_Display(image_buffer);        
+    }
+}
+
+
+void epaper_draw_bitmap(uint8_t * const image_buffer, const unsigned char* bmp) 
 {
     LOG_DBG("Draw bitmap image");
-    Paint_SelectImage(DisplayImage);
+    Paint_SelectImage(image_buffer);
     Paint_SetScale(2);
     Paint_Clear(WHITE);
     Paint_DrawBitMap(bmp);
-    EPD_4in26_Display(DisplayImage);
+    EPD_4in26_Display(image_buffer);
 }
 
 /************************************************************************
