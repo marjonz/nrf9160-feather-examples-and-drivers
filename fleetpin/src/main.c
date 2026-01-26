@@ -19,7 +19,6 @@ LOG_MODULE_REGISTER(main);
 
 /* Local */
 #include "cloud/cloud.h"
-//#include "gnss/gnss.h"
 #include "date_time.h"
 #include "epaper/epaper.h"
 #include "flash/flash_fs.h"
@@ -36,7 +35,6 @@ K_TIMER_DEFINE(timer, timeout_handler, NULL);
 /* Thread control */
 K_SEM_DEFINE(thread_sem, 0, 1);
 K_SEM_DEFINE(lte_connected, 0, 1);
-// K_SEM_DEFINE(gnss_sem, 0, 1);
 
 /* Variables */
 // Declare a static image buffer for the ePaper display
@@ -82,30 +80,6 @@ static void lte_handler(const struct lte_lc_evt *evt)
     }
 }
 
-/* Initialization of AUX pin */
-#if defined(CONFIG_BOARD_CIRCUITDOJO_FEATHER_NRF9151)
-#define AUXANTCFG_ENABLE "AT\%XANTCFG=1"
-
-NRF_MODEM_LIB_ON_INIT(aux_init_hook, on_modem_lib_init, NULL);
-
-static void on_modem_lib_init(int ret, void *ctx)
-{
-    ARG_UNUSED(ctx);
-
-    if (ret != 0)
-    {
-        return;
-    }
-
-    printk("*** Setting configuration: %s ***\n", AUXANTCFG_ENABLE);
-    int err = nrf_modem_at_printf("%s", AUXANTCFG_ENABLE);
-    if (err)
-    {
-        LOG_ERR("Failed to set configuration (err: %d)", err);
-    }
-}
-#endif
-
 static void push_http_bmp_into_epaper_buffer(bool is_first_chunk_of_data, 
     const uint8_t * const http_bmp_data, size_t http_data_len)
 {
@@ -135,14 +109,12 @@ static void store_epaper_buffer_to_file(const char * filename, const uint8_t * c
 /* Define the stack sizes for the threads */
 #define STACK_SIZE                  1024
 #define CLOUD_THREAD_STACK_SIZE     (2*STACK_SIZE)
-// #define GNSS_THREAD_STACK_SIZE      (2*STACK_SIZE)
 #define FLASH_THREAD_STACK_SIZE     (3*STACK_SIZE)
 #define EPAPER_THREAD_STACK_SIZE    (2*STACK_SIZE)
 /* Define thread priorities (lower number = higher priority) */
 #define CLOUD_PRIORITY 7 
-// #define GNSS_PRIORITY  8 
-#define EPAPER_PRIORITY 9
-#define FLASH_FS_PRIORITY 10
+#define EPAPER_PRIORITY 8
+#define FLASH_FS_PRIORITY 9
 
 static void get_time_now(void)
 {
@@ -161,11 +133,11 @@ static void date_time_handler(const struct date_time_evt *evt)
     switch (evt->type) 
     {
         case DATE_TIME_OBTAINED_NTP:
-            printk("Time obtained from NTP\n");
+            LOG_DBG("Time obtained from NTP\n");
             // Perform actions with time here
             break;
         case DATE_TIME_OBTAINED_MODEM:
-            printk("Time obtained from Modem\n");
+            LOG_DBG("Time obtained from Modem\n");
             break;
         default:
             break;
@@ -223,9 +195,6 @@ void cloud_thr(void *p1, void *p2, void *p3)
 
     LOG_INF("Safe to use sockets now. LTE is connected.");
 
-    // Modem is ready, tell the GNSS/GPS thread
-    // k_sem_give(&gnss_sem);
-
     get_time_now();
 
     /* Start timer to periodically wake the device and publish data */
@@ -256,30 +225,6 @@ void cloud_thr(void *p1, void *p2, void *p3)
         }
     }
 }
-
-#if 0
-/* Thread entry function for the second thread */
-void gnss_thr(void *p1, void *p2, void *p3) 
-{
-    ARG_UNUSED(p1);
-    ARG_UNUSED(p2);
-    ARG_UNUSED(p3);
-
-    // Wait until the modem is ready
-    k_sem_take(&gnss_sem, K_FOREVER);
-
-    /* Initialize GNSS module*/
-    int err = gnss_init();
-    if (err < 0)
-    {
-        LOG_ERR("Failed to initialize GNSS. Err: %i", err);
-        return;
-    }
-
-
-    gnss_thread();
-}
-#endif
 
 /* Thread entry function for the third thread */
 void epaper_thr(void *p1, void *p2, void *p3) 
@@ -312,7 +257,6 @@ void flash_fs_thr(void *p1, void *p2, void *p3)
 
 /* Define the threads using K_THREAD_DEFINE */
 K_THREAD_DEFINE(cloud_thread_id, CLOUD_THREAD_STACK_SIZE, cloud_thr, NULL, NULL, NULL, CLOUD_PRIORITY, 0, 0);
-// K_THREAD_DEFINE(gnss_thread_id, GNSS_THREAD_STACK_SIZE, gnss_thr, NULL, NULL, NULL, GNSS_PRIORITY, 0, 0);
 K_THREAD_DEFINE(epaper_thread_id, EPAPER_THREAD_STACK_SIZE, epaper_thr, NULL, NULL, NULL, EPAPER_PRIORITY, 0, 0);
 K_THREAD_DEFINE(flash_fs_thread_id, FLASH_THREAD_STACK_SIZE, flash_fs_thr, NULL, NULL, NULL, FLASH_FS_PRIORITY, 0, 0);
 
@@ -320,9 +264,6 @@ int main(void)
 {
     LOG_INF("Fleetpin Project. Board: %s", CONFIG_BOARD);
 
-    // /* GNSS pre-init functions */
-    // (void) gnss_pre_init();
-  
     /* The main thread can also perform work or go to sleep */
     while (1) 
     {
