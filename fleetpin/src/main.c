@@ -7,7 +7,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/pm/device.h>
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(main);
+LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 
 /* nRF Libraries */
 #include <modem/nrf_modem_lib.h>
@@ -25,6 +25,11 @@ LOG_MODULE_REGISTER(main);
 
 #include <inttypes.h>
 #include <stdint.h>
+#include <stdio.h>
+
+#ifndef CONFIG_APN_DEFAULT_VALUE
+#   define CONFIG_APN_DEFAULT_VALUE "onemondo"
+#endif
 
 #define CONFIG_RETRY_DELAY_MINUTES 1
 
@@ -84,6 +89,27 @@ static void lte_handler(const struct lte_lc_evt *evt)
 #if defined(CONFIG_BOARD_CIRCUITDOJO_FEATHER_NRF9151)
 #define AUXANTCFG_ENABLE "AT\%XANTCFG=1"
 
+static inline void set_apn_name(const char * apn_name)
+{
+#   define GET_APN_CONFIG "AT+CGDCONT?"
+#   define SET_APN_CONFIG "AT+CGDCONT=1,\"IP\","
+    char response[5u] = {0};
+    char at_command[60] = {0};
+    memset(response, 0, sizeof(response));
+    memset(at_command, 0, sizeof(at_command));
+
+    // Build the command to send
+    snprintf(at_command, sizeof(at_command), "%s\"%s\"\n", SET_APN_CONFIG, apn_name);
+
+    printk("*** Sending: %s ***\n", at_command);
+    int err = nrf_modem_at_cmd(response, sizeof(response), "%s", at_command);
+    if (err)
+    {
+        LOG_ERR("Failed to set configuration (err: %d)", err);
+    }
+    printk("*** Response: %s\n", response);
+}
+
 NRF_MODEM_LIB_ON_INIT(aux_init_hook, on_modem_lib_init, NULL);
 static void on_modem_lib_init(int ret, void *ctx)
 {
@@ -101,20 +127,7 @@ static void on_modem_lib_init(int ret, void *ctx)
         LOG_ERR("Failed to set configuration (err: %d)", err);
     }
 
-#ifdef SET_APN_TO_SPARK_NBIOT
-#   define GET_APN_CONFIG "AT+CGDCONT?"
-#   define SET_APN_CONFIG "AT+CGDCONT=1,\"IP\",\"m2m\""    // Spark APN: m2m
-        char response[60u] = {0};
-        memset(response, 0, sizeof(response));
-        printk("*** Sending: %s ***\n", SET_APN_CONFIG);
-        err = nrf_modem_at_cmd(response, sizeof(response), "%s", SET_APN_CONFIG);
-        if (err)
-        {
-            LOG_ERR("Failed to set configuration (err: %d)", err);
-        }
-        printk("*** Response: %s\n", response);
-#endif
-
+    set_apn_name(CONFIG_APN_DEFAULT_VALUE);
 }
 #endif
 
