@@ -80,6 +80,44 @@ static void lte_handler(const struct lte_lc_evt *evt)
     }
 }
 
+/* Initialization of AUX pin */
+#if defined(CONFIG_BOARD_CIRCUITDOJO_FEATHER_NRF9151)
+#define AUXANTCFG_ENABLE "AT\%XANTCFG=1"
+
+NRF_MODEM_LIB_ON_INIT(aux_init_hook, on_modem_lib_init, NULL);
+static void on_modem_lib_init(int ret, void *ctx)
+{
+    ARG_UNUSED(ctx);
+
+    if (ret != 0)
+    {
+        return;
+    }
+
+    printk("*** Setting configuration: %s ***\n", AUXANTCFG_ENABLE);
+    int err = nrf_modem_at_printf("%s", AUXANTCFG_ENABLE);
+    if (err)
+    {
+        LOG_ERR("Failed to set configuration (err: %d)", err);
+    }
+
+#ifdef SET_APN_TO_SPARK_NBIOT
+#   define GET_APN_CONFIG "AT+CGDCONT?"
+#   define SET_APN_CONFIG "AT+CGDCONT=1,\"IP\",\"m2m\""    // Spark APN: m2m
+        char response[60u] = {0};
+        memset(response, 0, sizeof(response));
+        printk("*** Sending: %s ***\n", SET_APN_CONFIG);
+        err = nrf_modem_at_cmd(response, sizeof(response), "%s", SET_APN_CONFIG);
+        if (err)
+        {
+            LOG_ERR("Failed to set configuration (err: %d)", err);
+        }
+        printk("*** Response: %s\n", response);
+#endif
+
+}
+#endif
+
 static void push_http_bmp_into_epaper_buffer(bool is_first_chunk_of_data, 
     const uint8_t * const http_bmp_data, size_t http_data_len)
 {
