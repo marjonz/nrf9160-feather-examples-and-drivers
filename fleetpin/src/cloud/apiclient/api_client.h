@@ -4,13 +4,19 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define API_CLIENT_CFG_VER_LENGTH   (20u)
+#define API_CLIENT_ERR_MSG_LENGTH   (50u)
 #define API_CLIENT_MAX_ETAG_LENGTH  (50u)
 typedef struct 
 {
     bool success;
     bool has_update;
+    int status_code;
     char last_etag[API_CLIENT_MAX_ETAG_LENGTH];
     uint8_t * ruc_bitmap;
+    char config_version[API_CLIENT_CFG_VER_LENGTH];
+    uint32_t sleepForSeconds;
+    char error_message[API_CLIENT_ERR_MSG_LENGTH];
 } api_client_result_t;
 
 typedef struct 

@@ -175,7 +175,7 @@ static void get_time_now(void)
     int err = date_time_now(&time_now);
     if (err < 0)
     {
-        LOG_ERR("Failed to connect. Err: %i", err);
+        LOG_ERR("Failed to get date/time. Err: %i", err);
         return;
     }
     LOG_DBG("Time now: %" PRIi64 "ms", time_now);
