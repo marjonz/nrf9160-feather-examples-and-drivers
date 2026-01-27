@@ -9,6 +9,8 @@ target_sources(app PRIVATE src/main.c)
 
 # LTE Cloud files
 target_sources(app PRIVATE src/cloud/cloud.c)
+# Authentication
+target_sources(app PRIVATE src/cloud/authentication/auth.c)
 
 # Waveshare epaper files
 target_sources(app PRIVATE src/epaper/epaper_driver.c)
