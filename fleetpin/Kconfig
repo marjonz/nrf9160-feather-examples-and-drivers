@@ -12,6 +12,12 @@ config APN_DEFAULT_VALUE
     help
       This is a custom string configuration for the APN of SIM card used.
 
+config DEVICE_ID
+    int "Device ID of this device"
+    default "0"
+    help
+      This is a custom string configuration for the device ID of this device.
+
 rsource "src/cloud/Kconfig.cloud"
 
 rsource "src/flash/Kconfig.flash"

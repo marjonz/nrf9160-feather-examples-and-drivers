@@ -24,6 +24,7 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 #include "flash/flash_fs.h"
 
 #include "lib/macro.h"
+#include "version.h"
 
 #include <inttypes.h>
 #include <stdint.h>
@@ -103,13 +104,13 @@ static inline void set_apn_name(const char * apn_name)
     // Build the command to send
     snprintf(at_command, sizeof(at_command), "%s\"%s\"\n", SET_APN_CONFIG, apn_name);
 
-    printk("*** Sending: %s ***\n", at_command);
+    LOG_DBG("Sending APN config: %sn", at_command);
     int err = nrf_modem_at_cmd(response, sizeof(response), "%s", at_command);
     if (err)
     {
-        LOG_ERR("Failed to set configuration (err: %d)", err);
+        LOG_ERR("Failed to set APN configuration (err: %d)", err);
     }
-    printk("*** Response: %s\n", response);
+    LOG_DBG("APN config Response: %s", response);
 }
 
 NRF_MODEM_LIB_ON_INIT(aux_init_hook, on_modem_lib_init, NULL);
@@ -122,7 +123,7 @@ static void on_modem_lib_init(int ret, void *ctx)
         return;
     }
 
-    printk("*** Setting configuration: %s ***\n", AUXANTCFG_ENABLE);
+    LOG_DBG("*** Setting configuration: %s ***\n", AUXANTCFG_ENABLE);
     int err = nrf_modem_at_printf("%s", AUXANTCFG_ENABLE);
     if (err)
     {

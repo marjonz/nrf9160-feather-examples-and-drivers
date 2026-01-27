@@ -3,17 +3,24 @@
 #include "cloud/authentication/auth.h"
 #include "date_time.h"
 #include "lib/macro.h"
+#include "version.h"
 #include "zephyr/kernel.h"
+#include <zephyr/logging/log.h>
 
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
 
-#define MAX_DEVICE_CONFIG_STRING_LEN    (UINT32_MAX)
+LOG_MODULE_REGISTER(api_client, LOG_LEVEL_DBG);
+
+#define MAX_DEVICE_CONFIG_STRING_LEN    (10u) // Number of characters in UINT32_MAX
+#define MAX_HEADER_FIELD_LEN            (20U)
 #define MAX_URL_LENGTH                  (64U)
 #define UNIX_MS_JAN_1_2021              (1609459200)
 static char url_buffer[MAX_URL_LENGTH] = {0};
+#define MAX_HTTP_HEADER_INFO_LENGTH     (1024U)
+static char http_header_info[MAX_HTTP_HEADER_INFO_LENGTH] = {0};
 
 enum 
 {
@@ -28,13 +35,16 @@ enum
     hdr_max_len // MUST BE LAST
 } header_index;
 
-static char http_headers[][hdr_max_len] = 
+// Static const stores to the flash (code space) instead of ram space
+static const char * user_agent_field_value = "Fleetpin EPD Client/1.0";
+static const char * auth_version = "v1";
+static const char * http_headers[hdr_max_len][MAX_HEADER_FIELD_LEN] = 
 {
     [hdr_auth_version]      = {"X-Auth-Version:"}, 
     [hdr_device_id]         = {"X-Device-ID:"}, 
     [hdr_timestamp]         = {"X-Timestamp:"}, 
     [hdr_signature]         = {"X-Signature:"}, 
-    [hdr_user_agent]        = {"User-Agent:Fleetpin EPD Client/1.0"}, 
+    [hdr_user_agent]        = {"User-Agent:"}, 
     [hdr_none_match]        = {"If-None-Match:"},
     [hdr_config_version]    = {"X-Config-Version:"},
     [hdr_firmware_build]    = {"X-Firmware-Build:"},
@@ -53,20 +63,22 @@ static bool is_current_time_valid(int64_t * current_timestamp)
     }
 
     LOG_DBG("Date/time: %" PRIi64, current_time);
-    current_timestamp = current_time;
+    *current_timestamp = current_time;
     return true;
 }
 
 api_client_result_t api_client_request_udpate(const char * target_url_endpoint, device_cfg_t config)
 {
-    api_client_result_t result;
+    api_client_result_t result = 
+    {
+        .has_update = false,
+        .success = false,
+        .status_code = -1,
+    };
 
     int64_t current_time = 0;
     if (!is_current_time_valid(&current_time))
     {
-        result.has_update = false;
-        result.success = false;
-        result.status_code = -1;
         snprintf(result.error_message, sizeof(result.error_message), "Time not synchronized");
         return result;
     }
@@ -76,30 +88,84 @@ api_client_result_t api_client_request_udpate(const char * target_url_endpoint, 
     LOG_DBG("[APIClient] Body hash (empty): %s\n", body_hash);
 
     // Build canonical string
-    char device_config_string[MAX_DEVICE_CONFIG_STRING_LEN];
-    ZERO_ARRAY(device_config_string);
-    snprintf(device_config_string, sizeof(device_config_string),"%" PRIu32, config.device_id);
+    char device_id_string[MAX_DEVICE_CONFIG_STRING_LEN];
+    ZERO_ARRAY(device_id_string);
+    snprintf(device_id_string, sizeof(device_id_string),"%" PRIu32, config.device_id);
+    ARG_UNUSED(device_id_string);
     char * canonical = auth_build_canonical_string(
-    "v1",
-    device_config_string,
-    current_time,
-    "GET",
-    //resource.c_str(),
-    target_url_endpoint, // FIXME: Should this only be the endpoint not including the domain?
-    body_hash
+        "v1",
+        device_id_string,
+        current_time,
+        "GET",
+        //resource.c_str(),
+        target_url_endpoint, // FIXME: Should this only be the endpoint not including the domain?
+        body_hash
     );
+    //ARG_UNUSED(canonical);
+    // Generate signature
+    char * hmac_signature = generateHMAC(canonical, config.api_secret);
+    printf("HMAC Signature: %s\n", hmac_signature);
+
+    // HTTP GET from target_url_endpoint, build header info first
+    // Build HTTP request headers, this will be appended to the http request structure.
+    ZERO_ARRAY(http_header_info);
+    snprintf(http_header_info, sizeof(http_header_info), "%s:%s", http_headers[hdr_auth_version], auth_version);
+    char temp_buffer[100u];
+    ZERO_ARRAY(temp_buffer);
+    snprintf(temp_buffer, sizeof(temp_buffer), "%s:%" PRIu32, http_headers[hdr_device_id], config.device_id);
+    strcat(http_header_info, temp_buffer);
+    ZERO_ARRAY(temp_buffer);
+    snprintf(temp_buffer, sizeof(temp_buffer), "%s:%" PRIi64, http_headers[hdr_timestamp], current_time);
+    strcat(http_header_info, temp_buffer);
+    ZERO_ARRAY(temp_buffer);
+    snprintf(temp_buffer, sizeof(temp_buffer), "%s:%s", http_headers[hdr_signature], hmac_signature);
+    strcat(http_header_info, temp_buffer);
+    ZERO_ARRAY(temp_buffer);
+    snprintf(temp_buffer, sizeof(temp_buffer), "%s:%s", http_headers[hdr_user_agent], user_agent_field_value);
+    strcat(http_header_info, temp_buffer);
+    ZERO_ARRAY(temp_buffer);
+    snprintf(temp_buffer, sizeof(temp_buffer), "%s:\"%s\"", http_headers[hdr_none_match], config.last_etag);
+    strcat(http_header_info, temp_buffer);
+    ZERO_ARRAY(temp_buffer);
+    snprintf(temp_buffer, sizeof(temp_buffer), "%s:%" PRIu16, http_headers[hdr_config_version], config.version);
+    strcat(http_header_info, temp_buffer);
+    ZERO_ARRAY(temp_buffer);
+    snprintf(temp_buffer, sizeof(temp_buffer), "%s:%s", http_headers[hdr_firmware_build], VERSION);
+    strcat(http_header_info, temp_buffer);
+
+    return result;
+}
+
+
+#if 0
+    // Debug: Print authentication details for config request
+    LOG_DBG("Config Auth - Device: %" PRIu32 ", Timestamp: %" PRIi64 ", Path: %s\n", config.device_id, current_time, target_url_endpoint);
+    LOG_DBG("Config Auth - Canonical length: %d bytes\n", strlen(canonical));
 
     ZERO_ARRAY(url_buffer);
     snprintf(url_buffer, sizeof(url_buffer), "%s\?device=%" PRIu32 "&auth=false", target_url_endpoint, config.device_id);
 
-    int64_t current_up_time = k_uptime_get();
-    char message[MAX_URL_LENGTH] = {0};
-    ZERO_ARRAY(message);
-    snprintf(message, sizeof(message), "%" PRIu32 ":" "%" PRIi64 ":%s:%" PRIi64, 
-        config.device_id, current_up_time, config.last_etag, current_up_time);
+    // Generate signature
+    char * hmac_signature = generateHMAC(canonical, config.api_secret);
+    printf("HMAC Signature: %s\n", hmac_signature);
 
-    // TODO: Pull from the filesystem, currently unused.
-    const char * deviceSecret = "super-secret-key";  // Store securely in NVS ideally
-    char * hmac_result = auth_generate_hmac(message, deviceSecret);
-    return result;
-}
+    // Build HTTP request headers, this will be appended to the http request structure.
+    ZERO_ARRAY(http_header_info);
+    snprintf(http_header_info, sizeof(http_header_info), "%s:%s", http_headers[hdr_auth_version], auth_version);
+    char temp_buffer[100u];
+    ZERO_ARRAY(temp_buffer);
+    snprintf(temp_buffer, sizeof(temp_buffer), "%s:%" PRIu32, http_headers[hdr_device_id], config.device_id);
+    strcat(http_header_info, temp_buffer);
+    ZERO_ARRAY(temp_buffer);
+    snprintf(temp_buffer, sizeof(temp_buffer), "%s:%" PRIi64, http_headers[hdr_timestamp], current_time);
+    strcat(http_header_info, temp_buffer);
+    ZERO_ARRAY(temp_buffer);
+    snprintf(temp_buffer, sizeof(temp_buffer), "%s:%s", http_headers[hdr_signature], hmac_signature);
+    strcat(http_header_info, temp_buffer);
+    ZERO_ARRAY(temp_buffer);
+    snprintf(temp_buffer, sizeof(temp_buffer), "%s:%s", http_headers[hdr_user_agent], user_agent_field_value);
+    strcat(http_header_info, temp_buffer);
+    ZERO_ARRAY(temp_buffer);
+    snprintf(temp_buffer, sizeof(temp_buffer), "%s:%s", http_headers[hdr_firmware_build], VERSION);
+    strcat(http_header_info, temp_buffer);
+#endif
