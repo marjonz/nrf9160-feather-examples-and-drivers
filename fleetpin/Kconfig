@@ -5,10 +5,14 @@ source "Kconfig.zephyr"
 config DEFAULT_DELAY
     int "Update interval (minutes)"
     default 2
-    
-rsource "src/cloud/Kconfig.cloud"
 
-rsource "src/gnss/Kconfig.gnss"
+config APN_DEFAULT_VALUE
+    string "Description of the string option"
+    default "onemondo"
+    help
+      This is a custom string configuration for the APN of SIM card used.
+
+rsource "src/cloud/Kconfig.cloud"
 
 rsource "src/flash/Kconfig.flash"
 

@@ -7,7 +7,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/pm/device.h>
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(main);
+LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 
 /* nRF Libraries */
 #include <modem/nrf_modem_lib.h>
@@ -19,9 +19,17 @@ LOG_MODULE_REGISTER(main);
 
 /* Local */
 #include "cloud/cloud.h"
-#include "gnss/gnss.h"
+#include "date_time.h"
 #include "epaper/epaper.h"
 #include "flash/flash_fs.h"
+
+#include <inttypes.h>
+#include <stdint.h>
+#include <stdio.h>
+
+#ifndef CONFIG_APN_DEFAULT_VALUE
+#   define CONFIG_APN_DEFAULT_VALUE "onemondo"
+#endif
 
 #define CONFIG_RETRY_DELAY_MINUTES 1
 
@@ -32,7 +40,6 @@ K_TIMER_DEFINE(timer, timeout_handler, NULL);
 /* Thread control */
 K_SEM_DEFINE(thread_sem, 0, 1);
 K_SEM_DEFINE(lte_connected, 0, 1);
-K_SEM_DEFINE(gnss_sem, 0, 1);
 
 /* Variables */
 // Declare a static image buffer for the ePaper display
@@ -82,8 +89,28 @@ static void lte_handler(const struct lte_lc_evt *evt)
 #if defined(CONFIG_BOARD_CIRCUITDOJO_FEATHER_NRF9151)
 #define AUXANTCFG_ENABLE "AT\%XANTCFG=1"
 
-NRF_MODEM_LIB_ON_INIT(aux_init_hook, on_modem_lib_init, NULL);
+static inline void set_apn_name(const char * apn_name)
+{
+#   define GET_APN_CONFIG "AT+CGDCONT?"
+#   define SET_APN_CONFIG "AT+CGDCONT=1,\"IP\","
+    char response[5u] = {0};
+    char at_command[60] = {0};
+    memset(response, 0, sizeof(response));
+    memset(at_command, 0, sizeof(at_command));
 
+    // Build the command to send
+    snprintf(at_command, sizeof(at_command), "%s\"%s\"\n", SET_APN_CONFIG, apn_name);
+
+    printk("*** Sending: %s ***\n", at_command);
+    int err = nrf_modem_at_cmd(response, sizeof(response), "%s", at_command);
+    if (err)
+    {
+        LOG_ERR("Failed to set configuration (err: %d)", err);
+    }
+    printk("*** Response: %s\n", response);
+}
+
+NRF_MODEM_LIB_ON_INIT(aux_init_hook, on_modem_lib_init, NULL);
 static void on_modem_lib_init(int ret, void *ctx)
 {
     ARG_UNUSED(ctx);
@@ -99,6 +126,8 @@ static void on_modem_lib_init(int ret, void *ctx)
     {
         LOG_ERR("Failed to set configuration (err: %d)", err);
     }
+
+    set_apn_name(CONFIG_APN_DEFAULT_VALUE);
 }
 #endif
 
@@ -131,14 +160,40 @@ static void store_epaper_buffer_to_file(const char * filename, const uint8_t * c
 /* Define the stack sizes for the threads */
 #define STACK_SIZE                  1024
 #define CLOUD_THREAD_STACK_SIZE     (2*STACK_SIZE)
-#define GNSS_THREAD_STACK_SIZE      (2*STACK_SIZE)
 #define FLASH_THREAD_STACK_SIZE     (3*STACK_SIZE)
 #define EPAPER_THREAD_STACK_SIZE    (2*STACK_SIZE)
 /* Define thread priorities (lower number = higher priority) */
 #define CLOUD_PRIORITY 7 
-#define GNSS_PRIORITY  8 
-#define EPAPER_PRIORITY 9
-#define FLASH_FS_PRIORITY 10
+#define EPAPER_PRIORITY 8
+#define FLASH_FS_PRIORITY 9
+
+static void get_time_now(void)
+{
+    int64_t time_now = 0;
+    int err = date_time_now(&time_now);
+    if (err < 0)
+    {
+        LOG_ERR("Failed to connect. Err: %i", err);
+        return;
+    }
+    LOG_DBG("Time now: %" PRIi64 "ms", time_now);
+}
+
+static void date_time_handler(const struct date_time_evt *evt) 
+{
+    switch (evt->type) 
+    {
+        case DATE_TIME_OBTAINED_NTP:
+            LOG_DBG("Time obtained from NTP\n");
+            // Perform actions with time here
+            break;
+        case DATE_TIME_OBTAINED_MODEM:
+            LOG_DBG("Time obtained from Modem\n");
+            break;
+        default:
+            break;
+    }
+}
 
 /* Thread entry function for the first thread (e.g., blinking an LED) */
 void cloud_thr(void *p1, void *p2, void *p3) 
@@ -148,6 +203,9 @@ void cloud_thr(void *p1, void *p2, void *p3)
     ARG_UNUSED(p2);
     ARG_UNUSED(p3);
     
+    // Register date time handler
+    date_time_register_handler(date_time_handler);
+
     /* Register callback handler to handler LTE events */
     lte_lc_register_handler(lte_handler);
 
@@ -181,13 +239,14 @@ void cloud_thr(void *p1, void *p2, void *p3)
         return;
     }
 
+    get_time_now();
+
     /* Wait for a while, because with IPv4v6 PDN the IPv6 activation takes a bit more time. */
 	k_sleep(K_SECONDS(1));
 
     LOG_INF("Safe to use sockets now. LTE is connected.");
 
-    // Modem is ready, tell the GNSS/GPS thread
-    k_sem_give(&gnss_sem);
+    get_time_now();
 
     /* Start timer to periodically wake the device and publish data */
     k_timer_start(&timer, K_MINUTES(CONFIG_DEFAULT_DELAY), K_MINUTES(CONFIG_DEFAULT_DELAY));
@@ -216,28 +275,6 @@ void cloud_thr(void *p1, void *p2, void *p3)
             k_timer_start(&timer, K_MINUTES(CONFIG_DEFAULT_DELAY), K_MINUTES(CONFIG_DEFAULT_DELAY));
         }
     }
-}
-
-/* Thread entry function for the second thread */
-void gnss_thr(void *p1, void *p2, void *p3) 
-{
-    ARG_UNUSED(p1);
-    ARG_UNUSED(p2);
-    ARG_UNUSED(p3);
-
-    // Wait until the modem is ready
-    k_sem_take(&gnss_sem, K_FOREVER);
-
-    /* Initialize GNSS module*/
-    int err = gnss_init();
-    if (err < 0)
-    {
-        LOG_ERR("Failed to initialize GNSS. Err: %i", err);
-        return;
-    }
-
-
-    gnss_thread();
 }
 
 /* Thread entry function for the third thread */
@@ -271,7 +308,6 @@ void flash_fs_thr(void *p1, void *p2, void *p3)
 
 /* Define the threads using K_THREAD_DEFINE */
 K_THREAD_DEFINE(cloud_thread_id, CLOUD_THREAD_STACK_SIZE, cloud_thr, NULL, NULL, NULL, CLOUD_PRIORITY, 0, 0);
-K_THREAD_DEFINE(gnss_thread_id, GNSS_THREAD_STACK_SIZE, gnss_thr, NULL, NULL, NULL, GNSS_PRIORITY, 0, 0);
 K_THREAD_DEFINE(epaper_thread_id, EPAPER_THREAD_STACK_SIZE, epaper_thr, NULL, NULL, NULL, EPAPER_PRIORITY, 0, 0);
 K_THREAD_DEFINE(flash_fs_thread_id, FLASH_THREAD_STACK_SIZE, flash_fs_thr, NULL, NULL, NULL, FLASH_FS_PRIORITY, 0, 0);
 
@@ -279,10 +315,6 @@ int main(void)
 {
     LOG_INF("Fleetpin Project. Board: %s", CONFIG_BOARD);
 
-    // /* GNSS pre-init functions */
-    (void) gnss_pre_init();
-
-  
     /* The main thread can also perform work or go to sleep */
     while (1) 
     {

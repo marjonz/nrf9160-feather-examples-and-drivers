@@ -40,7 +40,7 @@ static int littlefs_flash_erase(unsigned int id)
 		return rc;
 	}
 
-	LOG_PRINTK("Area %u at 0x%x on %s for %u bytes\n",
+	LOG_DBG("Area %u at 0x%x on %s for %u bytes\n",
 			   id, (unsigned int)pfa->fa_off, pfa->fa_dev->name,
 			   (unsigned int)pfa->fa_size);
 
@@ -109,7 +109,7 @@ static int nor_storage_increment(char *fname)
 		LOG_ERR("FAIL: read %s: [rd:%d]", fname, rc);
 		goto out;
 	}
-	LOG_PRINTK("%s read count:%u (bytes: %d)\n", fname, boot_count, rc);
+	LOG_DBG("%s read count:%u (bytes: %d)\n", fname, boot_count, rc);
 
 	rc = fs_seek(&file, 0, FS_SEEK_SET);
 	if (rc < 0)
@@ -126,7 +126,7 @@ static int nor_storage_increment(char *fname)
 		goto out;
 	}
 
-	LOG_PRINTK("%s write new boot count %u: [wr:%d]\n", fname,
+	LOG_DBG("%s write new boot count %u: [wr:%d]\n", fname,
 			   boot_count, rc);
 
 out:

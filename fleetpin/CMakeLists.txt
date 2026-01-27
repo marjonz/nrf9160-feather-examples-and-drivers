@@ -23,9 +23,4 @@ target_sources(app PRIVATE src/epaper/Fonts/font24.c)
 # Flash filesystem
 target_sources(app PRIVATE src/flash/flash_fs.c)
 
-# GPS/GNSS files (needs LTE driver too)
-target_sources(app PRIVATE src/gnss/gnss.c)
-zephyr_library_sources_ifdef(CONFIG_GNSS_SAMPLE_ASSISTANCE_NRF_CLOUD ${NRF_DIR}/samples/cellular/gnss/src/assistance.c)
-zephyr_library_sources_ifdef(CONFIG_GNSS_SAMPLE_ASSISTANCE_SUPL ${NRF_DIR}/samples/cellular/gnss/src/assistance_supl.c)
-zephyr_library_sources_ifdef(CONFIG_GNSS_SAMPLE_ASSISTANCE_MINIMAL ${NRF_DIR}/samples/cellular/gnss/src/assistance_minimal.c)
-zephyr_library_sources_ifdef(CONFIG_GNSS_SAMPLE_ASSISTANCE_MINIMAL ${NRF_DIR}/samples/cellular/gnss/src/mcc_location_table.c)
+# Date / Time - the libraries are include via the defines in the prj.conf file
