@@ -23,7 +23,7 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 #include "epaper/epaper.h"
 #include "flash/flash_fs.h"
 
-#include "macro.h"
+#include "lib/macro.h"
 
 #include <inttypes.h>
 #include <stdint.h>

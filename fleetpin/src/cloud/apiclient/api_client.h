@@ -5,13 +5,26 @@
 #include <stdint.h>
 
 #define API_CLIENT_MAX_ETAG_LENGTH  (50u)
-typedef struct {
+typedef struct 
+{
     bool success;
     bool has_update;
     char last_etag[API_CLIENT_MAX_ETAG_LENGTH];
     uint8_t * ruc_bitmap;
 } api_client_result_t;
 
+typedef struct 
+{
+    uint32_t device_id;
+    const char * last_etag;
+} api_device_parameters_t;
 
+/*************************************************************************************************
+ * @brief Build and send an HTTP GET to the given endpoint
+ * @param target_url_endpoint - http endpoint to send the GET request to.
+ * @param params - the device parameters to be used to build the message to send.
+ * @return the result of the operation.
+ */
+api_client_result_t api_client_request_udpate(const char * target_url_endpoint, api_device_parameters_t params);
 
 #endif

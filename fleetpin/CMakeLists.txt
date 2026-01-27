@@ -29,4 +29,4 @@ target_sources(app PRIVATE src/flash/flash_fs.c)
 
 # Date / Time - the libraries are include via the defines in the prj.conf file
 
-target_include_directories(app PUBLIC src/lib)
+target_include_directories(app PUBLIC src)

@@ -1,11 +1,11 @@
 #include "auth.h"
+
 #include "mbedtls/md.h"
-#include "macro.h"
+#include "lib/macro.h"
 
+#include <inttypes.h>
+#include <stdio.h>
 #include <string.h>
-
-#define SHA256_BUFFER_SIZE      32u
-#define MAX_HMAC_BUFFER_SIZE    (SHA256_BUFFER_SIZE * 4u)
 
 /*****************************************
  * Local Variables
@@ -13,20 +13,24 @@
 //String deviceId = "device-1234";                // Unique per device
 // TODO: Pull from the filesystem
 static const char* deviceSecret = "super-secret-key";  // Store securely in NVS ideally
-static char hmac_hex[MAX_HMAC_BUFFER_SIZE] = {0};
+static char hmac_hex[AUTH_MAX_HMAC_BUFFER_SIZE];
 
 /*****************************************
  * Public Functions
  */
-char * auth_generate_hmac(const char * payload, size_t payload_len, const char * timestamp, size_t timestamp_len) 
+char * auth_generate_hmac(const char * payload, size_t payload_len, int64_t timestamp) 
 {
-    unsigned char hmacResult[SHA256_BUFFER_SIZE];  // SHA-256 = 32 bytes
+    unsigned char hmacResult[AUTH_SHA256_BUFFER_SIZE];  // SHA-256 = 32 bytes
+    ZERO_ARRAY(hmacResult);
 
-    char temp_message_buffer[MAX_HMAC_BUFFER_SIZE];
+    char temp_message_buffer[AUTH_MAX_HMAC_BUFFER_SIZE];
     ZERO_ARRAY(temp_message_buffer);
     // copy the payload and timestamp into the buffer.
     strncat(temp_message_buffer, payload, payload_len);
-    strncat(temp_message_buffer, timestamp, timestamp_len);
+    char time_buff[AUTH_SHA256_BUFFER_SIZE * 2u];
+    ZERO_ARRAY(time_buff);
+    snprintf(time_buff, sizeof(time_buff), "%" PRIi64, timestamp);
+    strncat(temp_message_buffer, time_buff, strlen(time_buff));
 
     mbedtls_md_context_t ctx = {0};
     const mbedtls_md_info_t* info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
@@ -40,7 +44,6 @@ char * auth_generate_hmac(const char * payload, size_t payload_len, const char *
 
     // Convert to hex string
     ZERO_ARRAY(hmac_hex);
-    char * hmac_hex_ptr = hmac_hex;
     for (uint8_t i = 0u; i < sizeof(hmacResult); i++) 
     {
         char hex_buff[3u];
@@ -48,5 +51,5 @@ char * auth_generate_hmac(const char * payload, size_t payload_len, const char *
         strncat(hmac_hex, hex_buff, sizeof(hex_buff));
     }
 
-    return hmac_hex;
+    return &hmac_hex[0];
 }
