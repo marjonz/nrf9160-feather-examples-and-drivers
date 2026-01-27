@@ -23,6 +23,8 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 #include "epaper/epaper.h"
 #include "flash/flash_fs.h"
 
+#include "macro.h"
+
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -95,8 +97,8 @@ static inline void set_apn_name(const char * apn_name)
 #   define SET_APN_CONFIG "AT+CGDCONT=1,\"IP\","
     char response[5u] = {0};
     char at_command[60] = {0};
-    memset(response, 0, sizeof(response));
-    memset(at_command, 0, sizeof(at_command));
+    ZERO_ARRAY(response);
+    ZERO_ARRAY(at_command);
 
     // Build the command to send
     snprintf(at_command, sizeof(at_command), "%s\"%s\"\n", SET_APN_CONFIG, apn_name);
