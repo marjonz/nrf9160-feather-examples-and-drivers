@@ -10,9 +10,35 @@
 #include <stdint.h>
 #include <string.h>
 
-#define MAX_URL_LENGTH          (64U)
-#define UNIX_MS_JAN_1_2021      (1609459200)
+#define MAX_DEVICE_CONFIG_STRING_LEN    (UINT32_MAX)
+#define MAX_URL_LENGTH                  (64U)
+#define UNIX_MS_JAN_1_2021              (1609459200)
 static char url_buffer[MAX_URL_LENGTH] = {0};
+
+enum 
+{
+    hdr_auth_version = 0u,
+    hdr_device_id,
+    hdr_timestamp,
+    hdr_signature,
+    hdr_user_agent,
+    hdr_none_match,
+    hdr_config_version,
+    hdr_firmware_build,
+    hdr_max_len // MUST BE LAST
+} header_index;
+
+static char http_headers[][hdr_max_len] = 
+{
+    [hdr_auth_version]      = {"X-Auth-Version:"}, 
+    [hdr_device_id]         = {"X-Device-ID:"}, 
+    [hdr_timestamp]         = {"X-Timestamp:"}, 
+    [hdr_signature]         = {"X-Signature:"}, 
+    [hdr_user_agent]        = {"User-Agent:Fleetpin EPD Client/1.0"}, 
+    [hdr_none_match]        = {"If-None-Match:"},
+    [hdr_config_version]    = {"X-Config-Version:"},
+    [hdr_firmware_build]    = {"X-Firmware-Build:"},
+};
 
 static bool is_current_time_valid(int64_t * current_timestamp)
 {
@@ -31,7 +57,7 @@ static bool is_current_time_valid(int64_t * current_timestamp)
     return true;
 }
 
-api_client_result_t api_client_request_udpate(const char * target_url_endpoint, api_device_parameters_t params)
+api_client_result_t api_client_request_udpate(const char * target_url_endpoint, device_cfg_t config)
 {
     api_client_result_t result;
 
@@ -50,9 +76,12 @@ api_client_result_t api_client_request_udpate(const char * target_url_endpoint, 
     LOG_DBG("[APIClient] Body hash (empty): %s\n", body_hash);
 
     // Build canonical string
+    char device_config_string[MAX_DEVICE_CONFIG_STRING_LEN];
+    ZERO_ARRAY(device_config_string);
+    snprintf(device_config_string, sizeof(device_config_string),"%" PRIu32, config.device_id);
     char * canonical = auth_build_canonical_string(
     "v1",
-    "1",    // FIXME: Should be device id
+    device_config_string,
     current_time,
     "GET",
     //resource.c_str(),
@@ -61,13 +90,13 @@ api_client_result_t api_client_request_udpate(const char * target_url_endpoint, 
     );
 
     ZERO_ARRAY(url_buffer);
-    snprintf(url_buffer, sizeof(url_buffer), "%s\?device=%" PRIu32 "&auth=false", target_url_endpoint, params.device_id);
+    snprintf(url_buffer, sizeof(url_buffer), "%s\?device=%" PRIu32 "&auth=false", target_url_endpoint, config.device_id);
 
     int64_t current_up_time = k_uptime_get();
     char message[MAX_URL_LENGTH] = {0};
     ZERO_ARRAY(message);
     snprintf(message, sizeof(message), "%" PRIu32 ":" "%" PRIi64 ":%s:%" PRIi64, 
-        params.device_id, current_up_time, params.last_etag, current_up_time);
+        config.device_id, current_up_time, config.last_etag, current_up_time);
 
     // TODO: Pull from the filesystem, currently unused.
     const char * deviceSecret = "super-secret-key";  // Store securely in NVS ideally
