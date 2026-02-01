@@ -27,6 +27,9 @@ target_sources(app PRIVATE src/epaper/Fonts/font24.c)
 # Flash filesystem
 target_sources(app PRIVATE src/flash/flash_fs.c)
 
+# Device configuration
+target_sources(app PRIVATE src/config/device_cfg.c)
+
 # Date / Time - the libraries are include via the defines in the prj.conf file
 
 target_include_directories(app PUBLIC src)

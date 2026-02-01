@@ -1,6 +1,8 @@
 #include "api_client.h"
 
 #include "cloud/authentication/auth.h"
+#include "cloud/apiclient/api_client.h"
+#include "cloud/cloud.h"
 #include "date_time.h"
 #include "lib/macro.h"
 #include "version.h"
@@ -16,9 +18,7 @@ LOG_MODULE_REGISTER(api_client, LOG_LEVEL_DBG);
 
 #define MAX_DEVICE_CONFIG_STRING_LEN    (10u) // Number of characters in UINT32_MAX
 #define MAX_HEADER_FIELD_LEN            (20U)
-#define MAX_URL_LENGTH                  (64U)
 #define UNIX_MS_JAN_1_2021              (1609459200)
-static char url_buffer[MAX_URL_LENGTH] = {0};
 #define MAX_HTTP_HEADER_INFO_LENGTH     (1024U)
 static char http_header_info[MAX_HTTP_HEADER_INFO_LENGTH] = {0};
 
@@ -40,14 +40,14 @@ static const char * user_agent_field_value = "Fleetpin EPD Client/1.0";
 static const char * auth_version = "v1";
 static const char * http_headers[hdr_max_len][MAX_HEADER_FIELD_LEN] = 
 {
-    [hdr_auth_version]      = {"X-Auth-Version:"}, 
-    [hdr_device_id]         = {"X-Device-ID:"}, 
-    [hdr_timestamp]         = {"X-Timestamp:"}, 
-    [hdr_signature]         = {"X-Signature:"}, 
-    [hdr_user_agent]        = {"User-Agent:"}, 
-    [hdr_none_match]        = {"If-None-Match:"},
-    [hdr_config_version]    = {"X-Config-Version:"},
-    [hdr_firmware_build]    = {"X-Firmware-Build:"},
+    [hdr_auth_version]      = {"X-Auth-Version: "}, 
+    [hdr_device_id]         = {"X-Device-ID: "}, 
+    [hdr_timestamp]         = {"X-Timestamp: "}, 
+    [hdr_signature]         = {"X-Signature: "}, 
+    [hdr_user_agent]        = {"User-Agent: "}, 
+    [hdr_none_match]        = {"If-None-Match: "},
+    [hdr_config_version]    = {"X-Config-Version: "},
+    [hdr_firmware_build]    = {"X-Firmware-Build: "},
 };
 
 static bool is_current_time_valid(int64_t * current_timestamp)
@@ -67,7 +67,9 @@ static bool is_current_time_valid(int64_t * current_timestamp)
     return true;
 }
 
-api_client_result_t api_client_request_udpate(const char * target_url_endpoint, device_cfg_t config)
+api_client_result_t api_client_request_udpate(const char * target_url_endpoint, 
+    const device_cfg_t * config, http_response_cb_t response_handler,
+    uint8_t * reponse_data_buffer, size_t reponse_data_buffer_len)
 {
     api_client_result_t result = 
     {
@@ -90,49 +92,55 @@ api_client_result_t api_client_request_udpate(const char * target_url_endpoint, 
     // Build canonical string
     char device_id_string[MAX_DEVICE_CONFIG_STRING_LEN];
     ZERO_ARRAY(device_id_string);
-    snprintf(device_id_string, sizeof(device_id_string),"%" PRIu32, config.device_id);
+    snprintf(device_id_string, sizeof(device_id_string),"%" PRIu32, config->device_id);
     ARG_UNUSED(device_id_string);
     char * canonical = auth_build_canonical_string(
         "v1",
         device_id_string,
         current_time,
         "GET",
-        //resource.c_str(),
         target_url_endpoint, // FIXME: Should this only be the endpoint not including the domain?
         body_hash
     );
-    //ARG_UNUSED(canonical);
     // Generate signature
-    char * hmac_signature = generateHMAC(canonical, config.api_secret);
+    char * hmac_signature = auth_generate_hmac(canonical, config->api_secret);
     printf("HMAC Signature: %s\n", hmac_signature);
 
     // HTTP GET from target_url_endpoint, build header info first
     // Build HTTP request headers, this will be appended to the http request structure.
     ZERO_ARRAY(http_header_info);
-    snprintf(http_header_info, sizeof(http_header_info), "%s:%s", http_headers[hdr_auth_version], auth_version);
+    snprintf(http_header_info, sizeof(http_header_info), "%s%s\r\n", *http_headers[hdr_auth_version], auth_version);
     char temp_buffer[100u];
     ZERO_ARRAY(temp_buffer);
-    snprintf(temp_buffer, sizeof(temp_buffer), "%s:%" PRIu32, http_headers[hdr_device_id], config.device_id);
+    snprintf(temp_buffer, sizeof(temp_buffer), "%s%" PRIu32 "\r\n", *http_headers[hdr_device_id], config->device_id);
     strcat(http_header_info, temp_buffer);
     ZERO_ARRAY(temp_buffer);
-    snprintf(temp_buffer, sizeof(temp_buffer), "%s:%" PRIi64, http_headers[hdr_timestamp], current_time);
+    snprintf(temp_buffer, sizeof(temp_buffer), "%s%" PRIi64 "\r\n", *http_headers[hdr_timestamp], current_time);
     strcat(http_header_info, temp_buffer);
     ZERO_ARRAY(temp_buffer);
-    snprintf(temp_buffer, sizeof(temp_buffer), "%s:%s", http_headers[hdr_signature], hmac_signature);
+    snprintf(temp_buffer, sizeof(temp_buffer), "%s%s\r\n", *http_headers[hdr_signature], hmac_signature);
     strcat(http_header_info, temp_buffer);
     ZERO_ARRAY(temp_buffer);
-    snprintf(temp_buffer, sizeof(temp_buffer), "%s:%s", http_headers[hdr_user_agent], user_agent_field_value);
+    snprintf(temp_buffer, sizeof(temp_buffer), "%s%s\r\n", *http_headers[hdr_user_agent], user_agent_field_value);
     strcat(http_header_info, temp_buffer);
     ZERO_ARRAY(temp_buffer);
-    snprintf(temp_buffer, sizeof(temp_buffer), "%s:\"%s\"", http_headers[hdr_none_match], config.last_etag);
+    snprintf(temp_buffer, sizeof(temp_buffer), "%s\"%s\"\r\n", *http_headers[hdr_none_match], config->last_etag);
     strcat(http_header_info, temp_buffer);
     ZERO_ARRAY(temp_buffer);
-    snprintf(temp_buffer, sizeof(temp_buffer), "%s:%" PRIu16, http_headers[hdr_config_version], config.version);
+    snprintf(temp_buffer, sizeof(temp_buffer), "%s%" PRIu16 "\r\n", *http_headers[hdr_config_version], config->version);
     strcat(http_header_info, temp_buffer);
     ZERO_ARRAY(temp_buffer);
-    snprintf(temp_buffer, sizeof(temp_buffer), "%s:%s", http_headers[hdr_firmware_build], VERSION);
+    snprintf(temp_buffer, sizeof(temp_buffer), "%s%s\r\n", *http_headers[hdr_firmware_build], VERSION);
     strcat(http_header_info, temp_buffer);
+    /* Don't keep connection open.. */
+    strcat(http_header_info, "Connection: close\r\n");
 
+    // Create the socket then send HTTP GET
+    char * http_headers_ptr = &http_header_info;
+    int err = cloud_get_from_endpoint(target_url_endpoint, &http_headers_ptr, response_handler,
+                reponse_data_buffer, reponse_data_buffer_len);
+    ARG_UNUSED(err);
+    result.status_code = err;
     return result;
 }
 

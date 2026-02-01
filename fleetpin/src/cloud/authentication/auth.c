@@ -2,6 +2,7 @@
 
 #include "mbedtls/md.h"
 #include "lib/macro.h"
+#include <mbedtls/base64.h>
 
 #include <inttypes.h>
 #include <stdio.h>
@@ -22,12 +23,12 @@ static char encode_base64_string[AUTH_MAX_ENCODE_BASE64_LENGTH];
  */
 // Build canonical string for v1 authentication
 char * auth_build_canonical_string(const char* version, const char* device_id,
-                           long timestamp, const char* method,
+                           int64_t timestamp, const char* method,
                            const char* path, const char* body_hash) 
 {
     ZERO_ARRAY(canonical_string);
     // Append each component followed by newline
-    snprintf(canonical_string, sizeof(canonical_string), "%s \n" "%s \n" "%s \n" "%s \n" "%s \n" "%s \n",
+    snprintf(canonical_string, sizeof(canonical_string), "%s \n" "%s \n" "%" PRIi64 " \n" "%s \n" "%s \n" "%s \n",
         version, device_id, timestamp, method, path, body_hash);
 
     return canonical_string;
@@ -59,8 +60,9 @@ char * auth_hash_request_body(const char * body, size_t length)
     for (uint8_t i = 0u; i < sizeof(hash_result); i++) 
     {
         char hex_buff[3u];
+        ZERO_ARRAY(hex_buff);
         snprintf(hex_buff, sizeof(hex_buff), "%02x", hash_result[i]);
-        strncat(hash_request_body, hex_buff, sizeof(hex_buff));
+        strcat(hash_request_body, hex_buff);
     }
 
     return hash_request_body;
@@ -76,7 +78,6 @@ char * auth_encode_base64(const unsigned char* input, size_t length)
     mbedtls_base64_encode(NULL, 0, &outputLen, input, length);
 
     // Allocate buffer (add 1 for null terminator)
-    unsigned char* output[outputLen + 1];
     ZERO_ARRAY(encode_base64_string); // Make sure it is Null terminated
 
     if (outputLen >= sizeof(encode_base64_string))

@@ -1,3 +1,9 @@
+#ifndef EPAPER_H
+#define EPAPER_H
+
+#include <stdint.h>
+#include <stdlib.h>
+
 /***********************************************************************
  * @file    epaper.h
  * @author  Flexware Ltd
@@ -66,3 +72,5 @@ void epaper_re_poweron(void);
  *
  */
 void epaper_debug_busy(void);
+
+#endif

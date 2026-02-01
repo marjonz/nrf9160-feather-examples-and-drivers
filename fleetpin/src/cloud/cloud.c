@@ -135,8 +135,7 @@ static int socket_setup()
         LOG_INF("Socket created.");
     }
 
-    struct timeval recv_timeout = {
-        .tv_sec = SOCKET_TIMEOUT_SEC};
+    struct timeval recv_timeout = {.tv_sec = SOCKET_TIMEOUT_SEC};
 
     err = setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &recv_timeout, sizeof(recv_timeout));
     if (err != 0)
@@ -210,6 +209,7 @@ clean_up:
         return fd;
 }
 
+#if 0
 static void response_cb(struct http_response *rsp,
                         enum http_final_call final_data,
                         void *user_data)
@@ -244,7 +244,65 @@ static void response_cb(struct http_response *rsp,
             cloud_callback(&data);
     }
 }
+#endif
 
+int cloud_get_from_endpoint(const char * url_endpoint, const char * http_headers,
+    http_response_cb_t callback_fn, 
+    uint8_t * reponse_data_buffer, size_t reponse_data_buffer_len)
+{
+        int fd = -1;
+    int ret = 0;
+
+    LOG_INF("Publish path: %s%s", CONFIG_CLOUD_HOSTNAME, url_endpoint);
+
+    /* Setup socket */
+    fd = socket_setup();
+    if (fd < 0)
+    {
+        LOG_ERR("Unable to setup socket. Err: %i", fd);
+        return fd;
+    }
+
+    LOG_INF("Socket setup complete");
+
+    /* POST */
+    struct http_request req;
+    memset(&req, 0, sizeof(req));
+    req.method = HTTP_GET;
+    req.url = url_endpoint;
+    req.host = CONFIG_CLOUD_HOSTNAME;
+    req.protocol = "HTTP/1.1";
+    req.payload = NULL; // No payload
+    req.payload_len = 0; // No payload
+    req.response = callback_fn;
+    req.recv_buf = reponse_data_buffer;
+    req.recv_buf_len = reponse_data_buffer_len;
+    req.content_type_value = "application/json";
+    req.header_fields = (const char **)&http_headers;
+
+    const int32_t get_timeout = 30000; // As per fleetpin implementation, 30 second timeout.
+    ret = http_client_req(fd, &req, get_timeout, NULL);
+    if (ret < 0)
+    {
+        LOG_ERR("Unable to send data to %s/%s. Err: %i", CONFIG_CLOUD_HOSTNAME, url_endpoint, ret);
+    }
+    else
+    {
+        LOG_INF("Data sent to %s%s successfully", CONFIG_CLOUD_HOSTNAME, url_endpoint);
+    }
+
+    if (fd)
+    {
+        /* Close connection */
+        (void)close(fd);
+    }
+    return ret;
+}
+
+// This is only applicable to the cJSON example and not for the final Fleetpin product.
+// We will need to do some of the calls necessary though like the socket and tls setup
+// and register the correct callback for which ever enpoint.
+#if 0 
 int cloud_publish(struct device_data *data)
 {
     int fd = -1;
@@ -326,6 +384,7 @@ int cloud_publish(struct device_data *data)
 
     return ret;
 }
+#endif
 
 /* Provision certificate to modem */
 int cert_provision(void)

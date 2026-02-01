@@ -19,6 +19,7 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 
 /* Local */
 #include "cloud/cloud.h"
+#include "config/device_cfg.h"
 #include "date_time.h"
 #include "epaper/epaper.h"
 #include "flash/flash_fs.h"
@@ -54,10 +55,7 @@ K_SEM_DEFINE(lte_connected, 0, 1);
 static uint8_t DisplayImage[MAX_IMAGE_SIZE] = {0};
 static size_t current_display_image_index = 0u;
 
-static struct device_data data = {
-    .do_something = true,
-};
-
+/** FIXME: CLEANUP UNUSED, only here for init */
 void cloud_cb(struct device_data *p_data)
 {
     LOG_INF("Cloud callback");
@@ -198,6 +196,39 @@ static void date_time_handler(const struct date_time_evt *evt)
     }
 }
 
+static void response_callback(struct http_response *rsp,
+				   enum http_final_call final_data,
+				   void *user_data)
+{
+    LOG_INF("HTTP Status %d", rsp->http_status_code);
+
+    /* Check status */
+    if (rsp->http_status_code != 200 && rsp->http_status_code != 201)
+    {
+        return;
+    }
+
+    if (final_data == HTTP_DATA_FINAL)
+    {
+        LOG_HEXDUMP_INF(rsp->recv_buf, rsp->recv_buf_len, "Response data");
+
+        if (!rsp->body_found)
+        {
+            LOG_ERR("Body not found");
+            return;
+        }
+
+        // TODO: Process response
+        ARG_UNUSED(user_data);
+
+        // If we need to store the response, copy the response to DisplayImage
+        char filename[] = "v0.1"; // Pull this from api_client_result_t var.config_version
+
+        //push_http_bmp_into_epaper_buffer(, DisplayImage);
+        store_epaper_buffer_to_file(filename, DisplayImage);
+    }
+}
+
 /* Thread entry function for the first thread (e.g., blinking an LED) */
 void cloud_thr(void *p1, void *p2, void *p3) 
 {
@@ -207,6 +238,7 @@ void cloud_thr(void *p1, void *p2, void *p3)
     ARG_UNUSED(p3);
     
     // Register date time handler
+    ARG_UNUSED(date_time_handler);
     date_time_register_handler(date_time_handler);
 
     /* Register callback handler to handler LTE events */
@@ -257,12 +289,20 @@ void cloud_thr(void *p1, void *p2, void *p3)
     /* Allow for instant publish */
     k_sem_give(&thread_sem);
 
+    device_cfg_t * device_cfg_ptr = device_cfg_get();
+
     while (1)
     {
         k_sem_take(&thread_sem, K_FOREVER);
 
         /* Publish and sleep .. */
-        err = cloud_publish(&data);
+        // Cloud publish was used for the cJSON example endpoint, we will need to do a different one for Fleetpin.
+        //err = cloud_publish(&data);
+        api_client_request_udpate("device", device_cfg_ptr, response_callback, DisplayImage, sizeof(DisplayImage));
+
+        // Wait until the socket times out or a response is received.
+        k_sem_take(&thread_sem, K_FOREVER);
+
         if (err < 0)
         {
             LOG_ERR("Unable to publish. Err: %i", err);
@@ -307,6 +347,9 @@ void flash_fs_thr(void *p1, void *p2, void *p3)
     ARG_UNUSED(p3);
 
     flash_fs_init();
+
+    // Try and read the device configuration from the file system.
+    device_cfg_init();
 }
 
 /* Define the threads using K_THREAD_DEFINE */
