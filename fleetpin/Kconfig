@@ -14,7 +14,7 @@ config APN_DEFAULT_VALUE
 
 config DEVICE_ID
     int "Device ID of this device"
-    default "0"
+    default 0
     help
       This is a custom string configuration for the device ID of this device.
 

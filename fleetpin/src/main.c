@@ -19,6 +19,7 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 
 /* Local */
 #include "cloud/cloud.h"
+#include "cloud/apiclient/api_client.h"
 #include "config/device_cfg.h"
 #include "date_time.h"
 #include "epaper/epaper.h"

@@ -136,8 +136,9 @@ api_client_result_t api_client_request_udpate(const char * target_url_endpoint,
     strcat(http_header_info, "Connection: close\r\n");
 
     // Create the socket then send HTTP GET
-    char * http_headers_ptr = &http_header_info;
-    int err = cloud_get_from_endpoint(target_url_endpoint, &http_headers_ptr, response_handler,
+    char * http_headers_ptr = http_header_info;
+    char * http_headers_dbl_ptr = http_headers_ptr;
+    int err = cloud_get_from_endpoint(target_url_endpoint, http_headers_dbl_ptr, response_handler,
                 reponse_data_buffer, reponse_data_buffer_len);
     ARG_UNUSED(err);
     result.status_code = err;

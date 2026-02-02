@@ -21,7 +21,8 @@ void device_cfg_init(void)
     if (flash_fs_is_file_exist("device_config"))
     {
         // Fetch the values
-        int err = flash_fs_read_file_to_fs("device_config", &device_configuration, sizeof(device_configuration));
+        uint8_t * device_config_ptr = (uint8_t *) &device_configuration;
+        int err = flash_fs_read_file_to_fs("device_config", device_config_ptr, sizeof(device_configuration));
         if (err != 0)
         {
             LOG_ERR("Failed to read device config from file.");
@@ -38,7 +39,8 @@ int  device_cfg_set(const device_cfg_t * new_value)
 {
     device_configuration = *new_value;
     // FIXME: Write to filesystem
-    int result = flash_fs_write_file_to_fs("device_config", device_configuration, sizeof(device_configuration));
+    const uint8_t * const device_config_ptr = (const uint8_t * const ) &device_configuration;
+    int result = flash_fs_write_file_to_fs("device_config", device_config_ptr, sizeof(device_configuration));
     if (result != 0)
     {
         LOG_ERR("Failed to write device config to file.");
