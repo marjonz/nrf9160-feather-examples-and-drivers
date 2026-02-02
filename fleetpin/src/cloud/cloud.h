@@ -9,20 +9,6 @@
 
 #include <zephyr/net/http/client.h>
 
-struct device_data
-{
-    bool do_something;
-};
-
-/**
- * @brief Publish data to the cloud
- *
- * @param data Pointer to device data
- * @return int 0 if successful, negative errno otherwise
- *
- */
-//int cloud_publish(struct device_data *data);
-
 /**
  * @brief Send a GET request to the URL endpoint
  * @param callback_fn - callback function to execute on response from endpoint.
@@ -35,10 +21,9 @@ int cloud_get_from_endpoint(const char * url_endpoint, const char * http_headers
 /**
  * @brief Initialize the cloud
  *
- * @param callback Callback function to be called when data is received
  * @return int 0 if successful, negative errno otherwise
  *
  */
-int cloud_init(void (*callback)(struct device_data *data));
+int cloud_init(void);
 
 #endif

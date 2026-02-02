@@ -23,7 +23,7 @@ bool flash_fs_is_file_exist(char * filename);
  * @param data_len - size of the the data to write to file.
  * @return 0 = succesful, errno number otherwise.
  */
-int flash_fs_write_file_to_fs(char * filename, const uint8_t * const data_to_write, size_t data_len);
+int flash_fs_write_file_to_fs(const char * filename, const uint8_t * const data_to_write, size_t data_len);
 
 /**
  * @brief API to read the data from a file
@@ -32,6 +32,6 @@ int flash_fs_write_file_to_fs(char * filename, const uint8_t * const data_to_wri
  * @param data_len - size of the the data to read from file.
  * @return 0 = succesful, errno number otherwise.
  */
-int flash_fs_read_file_to_fs(char * filename, uint8_t * const data_to_read, size_t data_len);
+int flash_fs_read_file_to_fs(const char * filename, uint8_t * const data_to_read, size_t data_len);
 
 #endif

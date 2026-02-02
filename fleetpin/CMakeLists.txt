@@ -33,8 +33,3 @@ target_sources(app PRIVATE src/config/device_cfg.c)
 # Date / Time - the libraries are include via the defines in the prj.conf file
 
 target_include_directories(app PUBLIC src)
-
-#find_package(mbedtls)
-
-#target_compile_definitions(app PUBLIC MBEDTLS_MD_CAN_SHA256="y")
-#add_definitions(-DMBEDTLS_MD_CAN_SHA256="y")

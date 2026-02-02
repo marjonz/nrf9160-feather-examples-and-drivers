@@ -2,7 +2,7 @@ menu "Application Configuration"
 
 source "Kconfig.zephyr"
 
-config DEFAULT_DELAY
+config DEFAULT_DELAY_MINUTES
     int "Update interval (minutes)"
     default 2
 

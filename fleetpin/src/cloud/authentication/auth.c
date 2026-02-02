@@ -11,9 +11,6 @@
 /*****************************************
  * Local Variables
  */
-//String deviceId = "device-1234";                // Unique per device, currently unused
-// TODO: Pull from the filesystem, currently unused.
-//static const char* deviceSecret = "super-secret-key";  // Store securely in NVS ideally
 static char hash_request_body[AUTH_MAX_HASH_REQ_BODY_LENGTH];
 static char canonical_string[AUTH_MAX_CANONICAL_STRING_LENGTH];
 static char encode_base64_string[AUTH_MAX_ENCODE_BASE64_LENGTH];

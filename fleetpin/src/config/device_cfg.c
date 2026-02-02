@@ -15,9 +15,8 @@ void device_cfg_init(void)
     device_configuration.device_id = CONFIG_DEVICE_ID;
     ZERO_ARRAY(device_configuration.last_etag);
     ZERO_ARRAY(device_configuration.api_secret);
-    device_configuration.version = 0;
+    ZERO_ARRAY(device_configuration.version);
 
-    // FIXME: Read values from filesystem
     if (flash_fs_is_file_exist("device_config"))
     {
         // Fetch the values
@@ -35,10 +34,9 @@ device_cfg_t * device_cfg_get(void)
     return &device_configuration;
 }
 
-int  device_cfg_set(const device_cfg_t * new_value)
+int device_cfg_set(const device_cfg_t * new_value)
 {
     device_configuration = *new_value;
-    // FIXME: Write to filesystem
     const uint8_t * const device_config_ptr = (const uint8_t * const ) &device_configuration;
     int result = flash_fs_write_file_to_fs("device_config", device_config_ptr, sizeof(device_configuration));
     if (result != 0)

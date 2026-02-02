@@ -35,4 +35,14 @@ api_client_result_t api_client_request_udpate(const char * target_url_endpoint,
     const device_cfg_t * config, http_response_cb_t response_handler,
     uint8_t * reponse_data_buffer, size_t reponse_data_buffer_len);
 
+    /*************************************************************************************************
+ * @brief Build and send an HTTP GET to the given endpoint
+ * @param target_url_endpoint - http endpoint to send the GET request to.
+ * @param params - the device parameters to be used to build the message to send.
+ * @return the result of the operation.
+ */
+api_client_result_t api_client_fetch_config(const char * target_url_endpoint, 
+    const device_cfg_t * config, http_response_cb_t response_handler,
+    uint8_t * reponse_data_buffer, size_t reponse_data_buffer_len);
+
 #endif

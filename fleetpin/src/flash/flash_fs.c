@@ -174,7 +174,7 @@ bool flash_fs_is_file_exist(char * filename)
 	return true;
 }
 
-int flash_fs_write_file_to_fs(char * filename, const uint8_t * const data_to_write, size_t data_len)
+int flash_fs_write_file_to_fs(const char * filename, const uint8_t * const data_to_write, size_t data_len)
 {
 	struct fs_file_t file;
 	int rc;
@@ -212,7 +212,7 @@ int flash_fs_write_file_to_fs(char * filename, const uint8_t * const data_to_wri
 	return (rc < 0 ? rc : 0);
 }
 
-int flash_fs_read_file_to_fs(char * filename, uint8_t * const data_to_read, size_t data_len)
+int flash_fs_read_file_to_fs(const char * filename, uint8_t * const data_to_read, size_t data_len)
 {
 	struct fs_file_t file;
 	int rc;
