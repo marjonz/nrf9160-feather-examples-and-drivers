@@ -28,9 +28,6 @@ static const char cert[] = {
 const int32_t timeout = 5 * MSEC_PER_SEC;
 #define SOCKET_TIMEOUT_SEC  8
 
-/* Callback */
-static void (*cloud_callback)(struct device_data *data);
-
 /* Setup TLS options on a given socket */
 int tls_setup(int fd)
 {
@@ -95,7 +92,7 @@ int tls_setup(int fd)
     return 0;
 }
 
-static int socket_setup()
+static int socket_setup(void)
 {
     int fd = -1;
     int err = 0;
@@ -135,8 +132,7 @@ static int socket_setup()
         LOG_INF("Socket created.");
     }
 
-    struct timeval recv_timeout = {
-        .tv_sec = SOCKET_TIMEOUT_SEC};
+    struct timeval recv_timeout = {.tv_sec = SOCKET_TIMEOUT_SEC};
 
     err = setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &recv_timeout, sizeof(recv_timeout));
     if (err != 0)
@@ -150,8 +146,7 @@ static int socket_setup()
         LOG_INF("Socket options set.");
     }    
 
-    struct timeval send_timeout = {
-        .tv_sec = SOCKET_TIMEOUT_SEC};
+    struct timeval send_timeout = {.tv_sec = SOCKET_TIMEOUT_SEC};
 
     err = setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &send_timeout, sizeof(send_timeout));
     if (err)
@@ -210,73 +205,19 @@ clean_up:
         return fd;
 }
 
-static void response_cb(struct http_response *rsp,
-                        enum http_final_call final_data,
-                        void *user_data)
+int cloud_get_from_endpoint(const char * url_endpoint, const char * http_headers,
+    http_response_cb_t callback_fn, 
+    uint8_t * reponse_data_buffer, size_t reponse_data_buffer_len)
 {
-
-    LOG_INF("HTTP Status %d", rsp->http_status_code);
-
-    /* Check status */
-    if (rsp->http_status_code != 200 && rsp->http_status_code != 201)
-    {
-        return;
-    }
-
-    if (final_data == HTTP_DATA_FINAL)
-    {
-        LOG_HEXDUMP_INF(rsp->recv_buf, rsp->recv_buf_len, "Response data");
-
-        if (!rsp->body_found)
-        {
-            LOG_ERR("Body not found");
-            return;
-        }
-
-        /* TODO: Decode and do something! */
-        /* Start of body is rsp->body_frag_start */
-        struct device_data data = {
-            .do_something = false,
-        };
-
-        /* Callback */
-        if (cloud_callback != NULL)
-            cloud_callback(&data);
-    }
-}
-
-int cloud_publish(struct device_data *data)
-{
-    int fd = -1;
+        int fd = -1;
     int ret = 0;
-    uint8_t recv_buf_ipv4[256] = {0};
 
-    LOG_INF("Publish path: %s%s", CONFIG_CLOUD_HOSTNAME, CONFIG_CLOUD_PUBLISH_PATH);
-
-    /* Create JSON */
-    cJSON *obj = cJSON_CreateObject();
-
-    cJSON_AddBoolToObject(obj, "do_something", data->do_something);
-
-    char *msg = cJSON_PrintUnformatted(obj);
-    cJSON_Delete(obj);
-
-    if (msg == NULL)
-    {
-        LOG_ERR("Unable to encode JSON");
-        return -ENOMEM;
-    }
-    else
-    {
-        LOG_INF("Payload: %s", msg);
-    }
+    LOG_INF("Publish path: %s%s", CONFIG_CLOUD_HOSTNAME, url_endpoint);
 
     /* Setup socket */
     fd = socket_setup();
     if (fd < 0)
     {
-        cJSON_free(msg);
-
         LOG_ERR("Unable to setup socket. Err: %i", fd);
         return fd;
     }
@@ -285,34 +226,28 @@ int cloud_publish(struct device_data *data)
 
     /* POST */
     struct http_request req;
-
     memset(&req, 0, sizeof(req));
-
-    /* Don't keep connection open.. */
-    char *const headers[] = {
-        "Connection: close\r\n",
-        NULL};
-
-    req.method = HTTP_POST;
-    req.url = CONFIG_CLOUD_PUBLISH_PATH;
+    req.method = HTTP_GET;
+    req.url = url_endpoint;
     req.host = CONFIG_CLOUD_HOSTNAME;
     req.protocol = "HTTP/1.1";
-    req.payload = msg;
-    req.payload_len = strlen(msg);
-    req.response = response_cb;
-    req.recv_buf = recv_buf_ipv4;
-    req.recv_buf_len = sizeof(recv_buf_ipv4);
+    req.payload = NULL; // No payload
+    req.payload_len = 0; // No payload
+    req.response = callback_fn;
+    req.recv_buf = reponse_data_buffer;
+    req.recv_buf_len = reponse_data_buffer_len;
     req.content_type_value = "application/json";
-    req.header_fields = (const char **)headers;
+    req.header_fields = (const char **)&http_headers;
 
-    ret = http_client_req(fd, &req, timeout, NULL);
+    const int32_t get_timeout_ms = 30000; // As per fleetpin implementation, 30 second timeout.
+    ret = http_client_req(fd, &req, get_timeout_ms, NULL);
     if (ret < 0)
     {
-        LOG_ERR("Unable to send data to cloud. Err: %i", ret);
+        LOG_ERR("Unable to send data to %s/%s. Err: %i", CONFIG_CLOUD_HOSTNAME, url_endpoint, ret);
     }
     else
     {
-        LOG_INF("Data sent to cloud successfully");
+        LOG_INF("Data sent to %s%s successfully", CONFIG_CLOUD_HOSTNAME, url_endpoint);
     }
 
     if (fd)
@@ -320,22 +255,17 @@ int cloud_publish(struct device_data *data)
         /* Close connection */
         (void)close(fd);
     }
-
-    /* Free data */
-    cJSON_free(msg);
-
     return ret;
 }
 
 /* Provision certificate to modem */
 int cert_provision(void)
 {
-    int err;
     bool exists;
     int mismatch;
 
     /* Check to see if it exists first .. */
-    err = modem_key_mgmt_exists(CONFIG_CLOUD_TLS_SEC_TAG, MODEM_KEY_MGMT_CRED_TYPE_CA_CHAIN, &exists);
+    int err = modem_key_mgmt_exists(CONFIG_CLOUD_TLS_SEC_TAG, MODEM_KEY_MGMT_CRED_TYPE_CA_CHAIN, &exists);
     if (err)
     {
         LOG_INF("Failed to check for certificates err %d", err);
@@ -375,19 +305,14 @@ int cert_provision(void)
     return 0;
 }
 
-int cloud_init(void (*callback)(struct device_data *data))
+int cloud_init(void)
 {
-    int err;
-
-    if (callback == NULL)
-        return -EINVAL;
-
-    cloud_callback = callback;
-
     /* Provision certificates before connecting to the LTE network */
-    err = cert_provision();
+    int err = cert_provision();
     if (err)
+    {
        LOG_ERR("Unable to provision certificate! Err: %i", err);
+    }
 
     return 0;
 }

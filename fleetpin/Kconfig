@@ -2,7 +2,7 @@ menu "Application Configuration"
 
 source "Kconfig.zephyr"
 
-config DEFAULT_DELAY
+config DEFAULT_DELAY_MINUTES
     int "Update interval (minutes)"
     default 2
 
@@ -11,6 +11,12 @@ config APN_DEFAULT_VALUE
     default "onemondo"
     help
       This is a custom string configuration for the APN of SIM card used.
+
+config DEVICE_ID
+    int "Device ID of this device"
+    default 0
+    help
+      This is a custom string configuration for the device ID of this device.
 
 rsource "src/cloud/Kconfig.cloud"
 

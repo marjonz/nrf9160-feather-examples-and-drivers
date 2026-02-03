@@ -1,0 +1,48 @@
+#ifndef API_CLIENT_H
+#define API_CLIENT_H
+
+#include "config/device_cfg.h"
+
+#include <zephyr/net/http/client.h>
+
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
+
+#define API_CLIENT_CFG_VER_LENGTH   (20u)
+#define API_CLIENT_ERR_MSG_LENGTH   (50u)
+#define API_CLIENT_MAX_ETAG_LENGTH  (DEV_CFG_MAX_ETAG_LENGTH)
+typedef struct 
+{
+    bool success;
+    bool has_update;
+    int status_code;
+    char last_etag[API_CLIENT_MAX_ETAG_LENGTH];
+    uint8_t * ruc_bitmap;
+    char config_version[API_CLIENT_CFG_VER_LENGTH];
+    uint32_t sleepForSeconds;
+    char error_message[API_CLIENT_ERR_MSG_LENGTH];
+} api_client_result_t;
+
+
+/*************************************************************************************************
+ * @brief Build and send an HTTP GET to the given endpoint
+ * @param target_url_endpoint - http endpoint to send the GET request to.
+ * @param params - the device parameters to be used to build the message to send.
+ * @return the result of the operation.
+ */
+api_client_result_t api_client_request_udpate(const char * target_url_endpoint, 
+    const device_cfg_t * config, http_response_cb_t response_handler,
+    uint8_t * reponse_data_buffer, size_t reponse_data_buffer_len);
+
+    /*************************************************************************************************
+ * @brief Build and send an HTTP GET to the given endpoint
+ * @param target_url_endpoint - http endpoint to send the GET request to.
+ * @param params - the device parameters to be used to build the message to send.
+ * @return the result of the operation.
+ */
+api_client_result_t api_client_fetch_config(const char * target_url_endpoint, 
+    const device_cfg_t * config, http_response_cb_t response_handler,
+    uint8_t * reponse_data_buffer, size_t reponse_data_buffer_len);
+
+#endif

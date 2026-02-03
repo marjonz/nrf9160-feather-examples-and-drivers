@@ -174,7 +174,7 @@ bool flash_fs_is_file_exist(char * filename)
 	return true;
 }
 
-int flash_fs_write_file_to_fs(char * filename, const uint8_t * const data_to_write, size_t data_len)
+int flash_fs_write_file_to_fs(const char * filename, const uint8_t * const data_to_write, size_t data_len)
 {
 	struct fs_file_t file;
 	int rc;
@@ -198,6 +198,44 @@ int flash_fs_write_file_to_fs(char * filename, const uint8_t * const data_to_wri
 	}
 
 	rc = fs_write(&file, data_to_write, data_len);
+	if (rc < 0)
+	{
+		LOG_ERR("FAIL: write %s: %d", filename, rc);
+	}
+
+	rc = fs_close(&file);
+	if (rc < 0)
+	{
+		LOG_ERR("FAIL: close %s: %d", filename, rc);
+	}
+
+	return (rc < 0 ? rc : 0);
+}
+
+int flash_fs_read_file_to_fs(const char * filename, uint8_t * const data_to_read, size_t data_len)
+{
+	struct fs_file_t file;
+	int rc;
+	fs_file_t_init(&file);
+	rc = fs_open(&file, filename, FS_O_CREATE | FS_O_RDWR);
+	if (rc < 0)
+	{
+		LOG_ERR("File %s not found: %d", filename, rc);
+		return false;
+	}
+
+	rc = fs_seek(&file, 0, FS_SEEK_SET);
+	if (rc < 0)
+	{
+		LOG_ERR("FAIL: seek %s: %d", filename, rc);
+		rc = fs_close(&file);
+		if (rc < 0)
+		{
+			LOG_ERR("FAIL: close %s: %d", filename, rc);
+		}
+	}
+
+	rc = fs_read(&file, data_to_read, data_len);
 	if (rc < 0)
 	{
 		LOG_ERR("FAIL: write %s: %d", filename, rc);
