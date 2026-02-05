@@ -20,7 +20,7 @@ LOG_MODULE_REGISTER(epaper, LOG_LEVEL_DBG);
 #endif
 
 #if defined(EPAPER_TEST_FLEXWARE_LOGO) || defined(DISPLAY_FLEETPIN_SAMPLE_IMAGE) || defined(CUSTOMER_LABEL)
-#define MAX_TEST_IMAGE_BUFFER_SIZE (480000u) // (800/8)*480
+#define MAX_TEST_IMAGE_BUFFER_SIZE (48000u) // (800/8)*480
 static uint8_t test_image_buffer[MAX_TEST_IMAGE_BUFFER_SIZE] = {0};
 #endif
 
