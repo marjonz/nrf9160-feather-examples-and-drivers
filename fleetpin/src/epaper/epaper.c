@@ -19,6 +19,11 @@ LOG_MODULE_REGISTER(epaper, LOG_LEVEL_DBG);
 #include "label.h"
 #endif
 
+#if defined(EPAPER_TEST_FLEXWARE_LOGO) || defined(DISPLAY_FLEETPIN_SAMPLE_IMAGE) || defined(CUSTOMER_LABEL)
+#define MAX_TEST_IMAGE_BUFFER_SIZE (480000u) // (800/8)*480
+static uint8_t test_image_buffer[MAX_TEST_IMAGE_BUFFER_SIZE] = {0};
+#endif
+
 int epaper_init(uint8_t * const image_buffer)
 {
     if (image_buffer == NULL)
@@ -102,29 +107,29 @@ void epaper_display_test(void)
     LOG_DBG("ePaper Display Test...");
 
     #ifdef EPAPER_TEST_FLEXWARE_LOGO
-    epaper_draw_bitmap(flexware_logo_800_x_480_v4_bits);
+    epaper_draw_bitmap(test_image_buffer, flexware_logo_800_x_480_v4_bits);
     k_msleep(2000);
     #endif
 
     #ifdef DISPLAY_FLEETPIN_SAMPLE_IMAGE
-    epaper_draw_bitmap(gImage_4in26);
+    epaper_draw_bitmap(test_image_buffer, gImage_4in26);
     k_msleep(2000);
     #endif
 
     #ifdef CUSTOMER_LABEL
-    epaper_draw_bitmap(fleetpin_label);
+    epaper_draw_bitmap(test_image_buffer, fleetpin_label);
     k_msleep(2000);
     #endif
 
     #if 0
-    Paint_NewImage(DisplayImage, EPD_4in26_WIDTH, EPD_4in26_HEIGHT, 0, WHITE);
+    Paint_NewImage(test_image_buffer, EPD_4in26_WIDTH, EPD_4in26_HEIGHT, 0, WHITE);
     LOG_DBG("Painting new image....");
-    EPD_4in26_Display_Base(DisplayImage);
+    EPD_4in26_Display_Base(test_image_buffer);
     k_msleep(2000);
     #endif
 
     #if 0
-    Paint_SelectImage(DisplayImage);
+    Paint_SelectImage(test_image_buffer);
     Paint_Clear(WHITE);
 
     Paint_DrawPoint(10, 80, BLACK, DOT_PIXEL_1X1, DOT_STYLE_DFT);
@@ -142,14 +147,14 @@ void epaper_display_test(void)
     Paint_DrawString_EN(10, 20, "Flexware is LOVE.", &Font12, WHITE, BLACK);
     Paint_DrawNum(10, 33, 123456789, &Font12, BLACK, WHITE);
     Paint_DrawNum(10, 50, 987654321, &Font16, WHITE, BLACK);
-    EPD_4in26_Display_Base(DisplayImage);
+    EPD_4in26_Display_Base(test_image_buffer);
     k_msleep(2000);
     #endif
 
     #if 0 // show image for array
     EPD_4in26_Init_4GRAY();
     LOG_DBG("4 grayscale display");
-    Paint_NewImage(DisplayImage, EPD_4in26_WIDTH, EPD_4in26_HEIGHT/2, 90, WHITE);
+    Paint_NewImage(test_image_buffer, EPD_4in26_WIDTH, EPD_4in26_HEIGHT/2, 90, WHITE);
     Paint_SetScale(4);
     Paint_Clear(0xff);
     
@@ -168,7 +173,7 @@ void epaper_display_test(void)
     Paint_DrawString_EN(10, 20, "hello world", &Font12, GRAY3, GRAY1);
     Paint_DrawNum(10, 33, 123456789, &Font12, GRAY4, GRAY2);
     Paint_DrawNum(10, 50, 987654321, &Font16, GRAY1, GRAY4);
-    EPD_4in26_4GrayDisplay(DisplayImage);
+    EPD_4in26_4GrayDisplay(test_image_buffer);
     k_msleep(3000);
 
 #endif
