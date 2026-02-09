@@ -102,6 +102,11 @@ api_client_result_t api_client_request_udpate(const char * target_url_endpoint,
         target_url_endpoint,
         body_hash
     );
+    if (canonical == NULL)
+    {
+        LOG_ERR("Failed to build canonical string. Aborting http request.");
+        return result;
+    }
     // Generate signature
     char * hmac_signature = auth_generate_hmac(canonical, config->api_secret);
     printf("HMAC Signature: %s\n", hmac_signature);
@@ -180,6 +185,11 @@ api_client_result_t api_client_fetch_config(const char * target_url_endpoint,
         target_url_endpoint,
         body_hash
     );
+    if (canonical == NULL)
+    {
+        LOG_ERR("Failed to build canonical string. Aborting http request.");
+        return result;
+    }
     // Generate signature
     char * hmac_signature = auth_generate_hmac(canonical, config->api_secret);
     printf("HMAC Signature: %s\n", hmac_signature);

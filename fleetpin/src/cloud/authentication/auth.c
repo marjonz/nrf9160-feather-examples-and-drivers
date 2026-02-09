@@ -3,10 +3,14 @@
 #include "lib/macro.h"
 #include <mbedtls/base64.h>
 #include <mbedtls/md.h>
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
 
 #include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
+
+LOG_MODULE_REGISTER(auth, LOG_LEVEL_ERR);
 
 /*****************************************
  * Local Variables
@@ -25,8 +29,13 @@ char * auth_build_canonical_string(const char* version, const char* device_id,
 {
     ZERO_ARRAY(canonical_string);
     // Append each component followed by newline
-    snprintf(canonical_string, sizeof(canonical_string), "%s \n" "%s \n" "%" PRIi64 " \n" "%s \n" "%s \n" "%s \n",
+    int result = snprintf(canonical_string, sizeof(canonical_string), "%s \n" "%s \n" "%" PRIi64 " \n" "%s \n" "%s \n" "%s \n",
         version, device_id, timestamp, method, path, body_hash);
+    if (result < 0)
+    {
+        LOG_ERR("Failed to build canonical string. Err: %i", result);
+        return NULL; // Error building string
+    }
 
     return canonical_string;
 }
