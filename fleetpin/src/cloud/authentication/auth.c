@@ -53,6 +53,12 @@ char * auth_build_canonical_string(const char* version, const char* device_id,
 
 char * auth_hash_request_body(const char * body, size_t length)
 {
+    if (body == NULL || length == 0)
+    {
+        // Return NULL
+        return NULL;
+    }
+
     unsigned char hash_result[AUTH_SHA256_BUFFER_SIZE];  // SHA-256 = 32 bytes
     ZERO_ARRAY(hash_result);
 
