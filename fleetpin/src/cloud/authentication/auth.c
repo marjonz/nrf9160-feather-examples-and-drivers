@@ -3,10 +3,14 @@
 #include "lib/macro.h"
 #include <mbedtls/base64.h>
 #include <mbedtls/md.h>
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
 
 #include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
+
+LOG_MODULE_REGISTER(auth, LOG_LEVEL_ERR);
 
 /*****************************************
  * Local Variables
@@ -24,15 +28,45 @@ char * auth_build_canonical_string(const char* version, const char* device_id,
                            const char* path, const char* body_hash) 
 {
     ZERO_ARRAY(canonical_string);
+    // This is a horrible assumption, but the assumption is that all these pointers will fit in the target buffer.
     // Append each component followed by newline
-    snprintf(canonical_string, sizeof(canonical_string), "%s \n" "%s \n" "%" PRIi64 " \n" "%s \n" "%s \n" "%s \n",
-        version, device_id, timestamp, method, path, body_hash);
+    char * end_of_string = strncat(canonical_string, version, strlen(version));    
+    end_of_string = strncat(end_of_string, " \n", 3); // Append whitespace + newline
+    end_of_string = strncat(end_of_string, device_id, strlen(device_id));
+    end_of_string = strncat(end_of_string, " \n", 3); // Append whitespace + newline
+    char timestamp_str[20u] = {0}; // Large enough to hold 64 bit int
+    snprintf(timestamp_str, sizeof(timestamp_str), "%" PRIi64, timestamp);
+    end_of_string = strncat(end_of_string, timestamp_str, strlen(timestamp_str));
+    end_of_string = strncat(end_of_string, " \n", 3); // Append whitespace + newline
+    end_of_string = strncat(end_of_string, method, strlen(method));
+    end_of_string = strncat(end_of_string, " \n", 3); // Append whitespace + newline
+    end_of_string = strncat(end_of_string, path, strlen(path));
+    end_of_string = strncat(end_of_string, " \n", 3); // Append whitespace + newline
 
+    //version, device_id, timestamp, method, path);
+    if ((body_hash != NULL) && strlen(body_hash) > 0)
+    {
+        // Append body hash if it is not empty
+        end_of_string = strncat(end_of_string, body_hash, strlen(body_hash));
+        if (end_of_string == NULL)
+        {
+            LOG_ERR("Failed to append body hash to canonical string.");
+            return NULL; // Error building string
+        }
+        (void) strncat(end_of_string, " \n", 3); // Append whitespace + newline after body hash
+    }
     return canonical_string;
 }
 
 char * auth_hash_request_body(const char * body, size_t length)
 {
+    if (body == NULL || length == 0)
+    {
+        // Return hash of empty string
+        body = "";
+        length = 0;
+    }
+    
     unsigned char hash_result[AUTH_SHA256_BUFFER_SIZE];  // SHA-256 = 32 bytes
     ZERO_ARRAY(hash_result);
 
