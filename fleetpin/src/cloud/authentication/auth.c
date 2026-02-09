@@ -29,12 +29,23 @@ char * auth_build_canonical_string(const char* version, const char* device_id,
 {
     ZERO_ARRAY(canonical_string);
     // Append each component followed by newline
-    int result = snprintf(canonical_string, sizeof(canonical_string), "%s \n" "%s \n" "%" PRIi64 " \n" "%s \n" "%s \n" "%s \n",
-        version, device_id, timestamp, method, path, body_hash);
+    int result = snprintf(canonical_string, sizeof(canonical_string), "%s \n" "%s \n" "%" PRIi64 " \n" "%s \n" "%s \n",
+        version, device_id, timestamp, method, path);
     if (result < 0)
     {
         LOG_ERR("Failed to build canonical string. Err: %i", result);
         return NULL; // Error building string
+    }
+    if ((body_hash != NULL) && strlen(body_hash) > 0)
+    {
+        // Append body hash if it is not empty
+        result = strncat(canonical_string, body_hash, strlen(body_hash));
+        if (result < 0)
+        {
+            LOG_ERR("Failed to append body hash to canonical string. Err: %i", result);
+            return NULL; // Error building string
+        }
+        (void) strncat(canonical_string, " \n", 2); // Append whitespace + newline after body hash
     }
 
     return canonical_string;
