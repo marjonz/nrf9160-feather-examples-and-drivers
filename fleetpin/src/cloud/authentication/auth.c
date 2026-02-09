@@ -28,26 +28,33 @@ char * auth_build_canonical_string(const char* version, const char* device_id,
                            const char* path, const char* body_hash) 
 {
     ZERO_ARRAY(canonical_string);
+    // This is a horrible assumption, but the assumption is that all these pointers will fit in the target buffer.
     // Append each component followed by newline
-    int result = snprintf(canonical_string, sizeof(canonical_string), "%s \n" "%s \n" "%" PRIi64 " \n" "%s \n" "%s \n",
-        version, device_id, timestamp, method, path);
-    if (result < 0)
-    {
-        LOG_ERR("Failed to build canonical string. Err: %i", result);
-        return NULL; // Error building string
-    }
+    char * end_of_string = strncat(canonical_string, version, strlen(version));    
+    end_of_string = strncat(end_of_string, " \n", 3); // Append whitespace + newline
+    end_of_string = strncat(end_of_string, device_id, strlen(device_id));
+    end_of_string = strncat(end_of_string, " \n", 3); // Append whitespace + newline
+    char timestamp_str[20u] = {0}; // Large enough to hold 64 bit int
+    snprintf(timestamp_str, sizeof(timestamp_str), "%" PRIi64, timestamp);
+    end_of_string = strncat(end_of_string, timestamp_str, strlen(timestamp_str));
+    end_of_string = strncat(end_of_string, " \n", 3); // Append whitespace + newline
+    end_of_string = strncat(end_of_string, method, strlen(method));
+    end_of_string = strncat(end_of_string, " \n", 3); // Append whitespace + newline
+    end_of_string = strncat(end_of_string, path, strlen(path));
+    end_of_string = strncat(end_of_string, " \n", 3); // Append whitespace + newline
+
+    //version, device_id, timestamp, method, path);
     if ((body_hash != NULL) && strlen(body_hash) > 0)
     {
         // Append body hash if it is not empty
-        result = strncat(canonical_string, body_hash, strlen(body_hash));
-        if (result < 0)
+        end_of_string = strncat(end_of_string, body_hash, strlen(body_hash));
+        if (end_of_string == NULL)
         {
-            LOG_ERR("Failed to append body hash to canonical string. Err: %i", result);
+            LOG_ERR("Failed to append body hash to canonical string.");
             return NULL; // Error building string
         }
-        (void) strncat(canonical_string, " \n", 2); // Append whitespace + newline after body hash
+        (void) strncat(end_of_string, " \n", 3); // Append whitespace + newline after body hash
     }
-
     return canonical_string;
 }
 
@@ -55,10 +62,11 @@ char * auth_hash_request_body(const char * body, size_t length)
 {
     if (body == NULL || length == 0)
     {
-        // Return NULL
-        return NULL;
+        // Return hash of empty string
+        body = "";
+        length = 0;
     }
-
+    
     unsigned char hash_result[AUTH_SHA256_BUFFER_SIZE];  // SHA-256 = 32 bytes
     ZERO_ARRAY(hash_result);
 
