@@ -43,7 +43,6 @@ char * auth_build_canonical_string(const char* version, const char* device_id,
     end_of_string = strncat(end_of_string, path, strlen(path));
     end_of_string = strncat(end_of_string, " \n", 3); // Append whitespace + newline
 
-    //version, device_id, timestamp, method, path);
     if ((body_hash != NULL) && strlen(body_hash) > 0)
     {
         // Append body hash if it is not empty
@@ -63,8 +62,7 @@ char * auth_hash_request_body(const char * body, size_t length)
     if (body == NULL || length == 0)
     {
         // Return hash of empty string
-        body = "";
-        length = 0;
+        return NULL;
     }
     
     unsigned char hash_result[AUTH_SHA256_BUFFER_SIZE];  // SHA-256 = 32 bytes
