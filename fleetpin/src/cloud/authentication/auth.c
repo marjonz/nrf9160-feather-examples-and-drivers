@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 LOG_MODULE_REGISTER(auth, LOG_LEVEL_ERR);
 
@@ -135,19 +136,99 @@ char * auth_generate_hmac(const char * canonical_string, const char * secret)
 {
     unsigned char hmac_result[AUTH_SHA256_BUFFER_SIZE];  // SHA-256 = 32 bytes
     ZERO_ARRAY(hmac_result);
+    int err = 0;
 
-    mbedtls_md_context_t ctx = {0};
+    #ifndef ORIGINAL
+    //Allocate memory to ctx 
+    struct mbedtls_md_context_t* ctx = (struct mbedtls_md_context_t*)malloc(sizeof(struct mbedtls_md_context_t)); 
+    if (ctx == NULL) 
+    {
+        LOG_ERR("Unable to allocate memory"); 
+    }
+    //Get info 
     const mbedtls_md_info_t* info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+    if(info == NULL) 
+    {
+        LOG_ERR("Couldnt find info for SHA256"); 
+    }
+    else 
+    {
+        LOG_ERR("Info Size: %d, Info Name: %s", mbedtls_md_get_size(info), mbedtls_md_get_name(info)); 
+    }
+    //Init the context. Just does a memset()
+    mbedtls_md_init(ctx);
+    //Setup ctx with info and using hmac 
+    err = mbedtls_md_setup(ctx, info, 0); //No hmac?
+    if(err) 
+    {
+        LOG_ERR("Setup Fail: %d", err);
+        err = 0; 
+    }
+    mbedtls_md_hmac_starts(ctx, (const unsigned char*)secret, strlen(secret));
+    if(err) 
+    {
+        LOG_ERR("HMAC Starts Fail: %d", err);
+        err = 0;
+    }
+    mbedtls_md_hmac_update(ctx, (const unsigned char*)canonical_string, strlen(canonical_string));
+    if(err) 
+    {
+        LOG_ERR("HMAC Update Fail: %d", err);
+        err = 0;
+    }
+    mbedtls_md_hmac_finish(ctx, hmac_result);
+    if(err) 
+    {
+        LOG_ERR("HMAC Finish Fail: %d", err);
+        err = 0;
+    }
 
-    LOG_ERR("Passed Canon to Auth Gen: %s, len %d", canonical_string, strlen(canonical_string)); 
-    LOG_ERR("Passed secret to auth gen: %s, len %d", secret, strlen(secret)); 
+    mbedtls_md_free(ctx);
 
+    free(ctx); 
+    ctx = NULL;
+
+    #else 
+    
+    const mbedtls_md_info_t* info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+    if(info == NULL) 
+    {
+        LOG_ERR("Couldnt find info for SHA256"); 
+    }
+ 
+    mbedtls_md_context_t ctx;
     mbedtls_md_init(&ctx);
-    mbedtls_md_setup(&ctx, info, 1);
+
+    err = mbedtls_md_setup(&ctx, info, 1); 
+    if(err) 
+    {
+        LOG_ERR("Setup Fail: %d", err);
+        err = 0; 
+    }
+    
     mbedtls_md_hmac_starts(&ctx, (const unsigned char*)secret, strlen(secret));
+    if(err) 
+    {
+        LOG_ERR("HMAC Starts Fail: %d", err);
+        err = 0;
+    }
     mbedtls_md_hmac_update(&ctx, (const unsigned char*)canonical_string, strlen(canonical_string));
+    if(err) 
+    {
+        LOG_ERR("HMAC Update Fail: %d", err);
+        err = 0;
+    }
     mbedtls_md_hmac_finish(&ctx, hmac_result);
+    if(err) 
+    {
+        LOG_ERR("HMAC Finish Fail: %d", err);
+        err = 0;
+    }
+    
     mbedtls_md_free(&ctx);
+    #endif 
+
+    //Can just call mbedtls_md_hmac which does all the above?
 
     LOG_ERR("HMAC result: %s, len %d", hmac_result, strlen(hmac_result)); 
 
