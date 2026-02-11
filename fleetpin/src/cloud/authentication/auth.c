@@ -9,6 +9,7 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 
 LOG_MODULE_REGISTER(auth, LOG_LEVEL_ERR);
 
@@ -24,7 +25,7 @@ static char encode_base64_string[AUTH_MAX_ENCODE_BASE64_LENGTH];
  */
 // Build canonical string for v1 authentication
 char * auth_build_canonical_string(const char* version, const char* device_id,
-                           int64_t timestamp, const char* method,
+                           uint64_t timestamp, const char* method,
                            const char* path, const char* body_hash) 
 {
     ZERO_ARRAY(canonical_string);
@@ -34,10 +35,11 @@ char * auth_build_canonical_string(const char* version, const char* device_id,
     end_of_string = strncat(end_of_string, " \n", 3); // Append whitespace + newline
     end_of_string = strncat(end_of_string, device_id, strlen(device_id));
     end_of_string = strncat(end_of_string, " \n", 3); // Append whitespace + newline
-    char timestamp_str[20u] = {0}; // Large enough to hold 64 bit int
-    snprintf(timestamp_str, sizeof(timestamp_str), "%" PRIi64, timestamp);
+    uint8_t timestamp_str[20u] = {0}; // Large enough to hold 64 bit int
+    uint8_t count = snprintf(timestamp_str, sizeof(timestamp_str), "%llu \n", timestamp);
+    LOG_ERR("Wrote %d bytes to %s", count, timestamp_str); 
     end_of_string = strncat(end_of_string, timestamp_str, strlen(timestamp_str));
-    end_of_string = strncat(end_of_string, " \n", 3); // Append whitespace + newline
+    //end_of_string = strncat(end_of_string, " \n", 3); // Append whitespace + newline
     end_of_string = strncat(end_of_string, method, strlen(method));
     end_of_string = strncat(end_of_string, " \n", 3); // Append whitespace + newline
     end_of_string = strncat(end_of_string, path, strlen(path));
@@ -65,6 +67,7 @@ char * auth_hash_request_body(const char * body, size_t length)
         // Return hash of empty string
         body = "";
         length = 0;
+        return NULL;
     }
     
     unsigned char hash_result[AUTH_SHA256_BUFFER_SIZE];  // SHA-256 = 32 bytes
@@ -136,12 +139,17 @@ char * auth_generate_hmac(const char * canonical_string, const char * secret)
     mbedtls_md_context_t ctx = {0};
     const mbedtls_md_info_t* info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
 
+    LOG_ERR("Passed Canon to Auth Gen: %s, len %d", canonical_string, strlen(canonical_string)); 
+    LOG_ERR("Passed secret to auth gen: %s, len %d", secret, strlen(secret)); 
+
     mbedtls_md_init(&ctx);
     mbedtls_md_setup(&ctx, info, 1);
     mbedtls_md_hmac_starts(&ctx, (const unsigned char*)secret, strlen(secret));
     mbedtls_md_hmac_update(&ctx, (const unsigned char*)canonical_string, strlen(canonical_string));
     mbedtls_md_hmac_finish(&ctx, hmac_result);
     mbedtls_md_free(&ctx);
+
+    LOG_ERR("HMAC result: %s, len %d", hmac_result, strlen(hmac_result)); 
 
     // Return Base64-encoded signature
     return auth_encode_base64(hmac_result, sizeof(hmac_result));

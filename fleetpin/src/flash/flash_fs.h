@@ -17,6 +17,12 @@ int flash_fs_init(void);
 bool flash_fs_is_file_exist(char * filename);
 
 /**
+ * @brief Create the file in the file system
+ * @return true if error, false if complete
+ */
+bool flash_fs_file_create(char * filename);
+
+/**
  * @brief API to write the data to a file
  * @param filename - filename to write to
  * @param data_to_write - pointer to the data to be written to the file.

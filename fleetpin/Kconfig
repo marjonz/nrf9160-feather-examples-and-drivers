@@ -18,6 +18,12 @@ config DEVICE_ID
     help
       This is a custom string configuration for the device ID of this device.
 
+config API_SECRET
+    string "API Secret for HMAC encoding"
+    default "ABC123"
+    help
+      API secret 
+
 rsource "src/cloud/Kconfig.cloud"
 
 rsource "src/flash/Kconfig.flash"

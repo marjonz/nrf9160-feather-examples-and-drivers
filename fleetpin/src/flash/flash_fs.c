@@ -159,6 +159,26 @@ bool flash_fs_is_file_exist(char * filename)
 	struct fs_file_t file;
 	int rc;
 	fs_file_t_init(&file);
+	rc = fs_open(&file, filename, FS_O_RDWR);
+	if (rc < 0)
+	{
+		LOG_ERR("File %s not found: %d", filename, rc);
+		return false;
+	}
+	rc = fs_close(&file);
+	if (rc < 0)
+	{
+		LOG_ERR("FAIL: close %s: %d", filename, rc);
+	}
+
+	return true;
+}
+
+bool flash_fs_file_create(char * filename)
+{
+	struct fs_file_t file;
+	int rc;
+	fs_file_t_init(&file);
 	rc = fs_open(&file, filename, FS_O_CREATE | FS_O_RDWR);
 	if (rc < 0)
 	{
@@ -183,7 +203,7 @@ int flash_fs_write_file_to_fs(const char * filename, const uint8_t * const data_
 	if (rc < 0)
 	{
 		LOG_ERR("File %s not found: %d", filename, rc);
-		return false;
+		return rc;
 	}
 
 	rc = fs_seek(&file, 0, FS_SEEK_SET);
@@ -217,7 +237,7 @@ int flash_fs_read_file_to_fs(const char * filename, uint8_t * const data_to_read
 	struct fs_file_t file;
 	int rc;
 	fs_file_t_init(&file);
-	rc = fs_open(&file, filename, FS_O_CREATE | FS_O_RDWR);
+	rc = fs_open(&file, filename, FS_O_RDWR);
 	if (rc < 0)
 	{
 		LOG_ERR("File %s not found: %d", filename, rc);
@@ -239,6 +259,10 @@ int flash_fs_read_file_to_fs(const char * filename, uint8_t * const data_to_read
 	if (rc < 0)
 	{
 		LOG_ERR("FAIL: write %s: %d", filename, rc);
+	}
+	else 
+	{
+		LOG_DBG("Read %d bytes from file", rc);
 	}
 
 	rc = fs_close(&file);

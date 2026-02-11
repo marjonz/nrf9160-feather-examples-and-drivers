@@ -508,7 +508,7 @@ void cloud_thr(void *p1, void *p2, void *p3)
         // See cloud.c : const int32_t get_timeout_ms = 30000; // As per fleetpin implementation, 30 second timeout.
         // FIXME: Implement the configugration callback handler separately
         //api_client_fetch_config("configuration", device_cfg_ptr, dump_of_request_config_response_handler_from_arduino, DisplayImage, sizeof(DisplayImage));
-        api_client_request_udpate("device", device_cfg_ptr, response_callback, DisplayImage, sizeof(DisplayImage));
+        api_client_request_udpate("/ruc/label.bmp", device_cfg_ptr, response_callback, DisplayImage, sizeof(DisplayImage));
         
         // Wait until the socket times out or a response is received.
         k_sem_take(&thread_sem, K_FOREVER);

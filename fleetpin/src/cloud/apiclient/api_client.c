@@ -78,7 +78,7 @@ api_client_result_t api_client_request_udpate(const char * target_url_endpoint,
         .status_code = -1,
     };
 
-    int64_t current_time = 0;
+    uint64_t current_time = 0;
     if (!is_current_time_valid(&current_time))
     {
         snprintf(result.error_message, sizeof(result.error_message), "Time not synchronized");
@@ -87,8 +87,10 @@ api_client_result_t api_client_request_udpate(const char * target_url_endpoint,
 
     // Hash request body (empty for GET)
     char * body_hash = auth_hash_request_body(NULL, 0);
-    LOG_DBG("[APIClient] Body hash (empty): %s\n", body_hash);
-
+    if (body_hash != NULL )
+    {
+        LOG_DBG("[APIClient] Body hash (empty): %s, len %d\n", body_hash, strlen(body_hash));
+    }
     // Build canonical string
     char device_id_string[MAX_DEVICE_CONFIG_STRING_LEN];
     ZERO_ARRAY(device_id_string);
@@ -140,6 +142,8 @@ api_client_result_t api_client_request_udpate(const char * target_url_endpoint,
     /* Don't keep connection open.. */
     strcat(http_header_info, "Connection: close\r\n");
 
+    LOG_DBG("HTTP Header: %s", http_header_info); 
+
     // Create the socket then send HTTP GET
     char * http_headers_ptr = http_header_info;
     char * http_headers_dbl_ptr = http_headers_ptr;
@@ -171,6 +175,9 @@ api_client_result_t api_client_fetch_config(const char * target_url_endpoint,
     // Hash request body (empty for GET)
     char * body_hash = auth_hash_request_body(NULL, 0);
     LOG_DBG("[APIClient] Body hash (empty): %s\n", body_hash);
+
+    //Debug: check api secret has been written 
+    LOG_DBG("API Secret: %s", config->api_secret); 
 
     // Build canonical string
     char device_id_string[MAX_DEVICE_CONFIG_STRING_LEN];

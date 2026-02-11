@@ -20,7 +20,7 @@
  * @param body_hash - body_hash to use to build the canonical string value
  */ 
 char * auth_build_canonical_string(const char* version, const char* device_id,
-                           int64_t timestamp, const char* method,
+                           uint64_t timestamp, const char* method,
                            const char* path, const char* body_hash);
 
 /***************************************************************************

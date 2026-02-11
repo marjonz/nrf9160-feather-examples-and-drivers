@@ -7,24 +7,80 @@
 
 LOG_MODULE_REGISTER(device_cfg, LOG_LEVEL_DBG);
 
-static device_cfg_t device_configuration = {0};
+static device_cfg_t device_configuration = {0}; 
 
 void device_cfg_init(void)
 {
+    //DEBUG:Print the init values to check
+    LOG_DBG("Init Dev ID: %d", device_configuration.device_id); 
+    LOG_DBG("Init Last ETAG: %s", device_configuration.last_etag);
+    LOG_DBG("Init API Secret: %s", device_configuration.api_secret);
+    LOG_DBG("Init Version: %s", device_configuration.version);
+
+    #ifdef INIT_WRITE
     // Set default values in case the file does not exists
     device_configuration.device_id = CONFIG_DEVICE_ID;
+    strncpy(device_configuration.last_etag, "1", sizeof(device_configuration.last_etag));
+    strncpy(device_configuration.api_secret, CONFIG_API_SECRET, sizeof(device_configuration.api_secret)); 
+    strncpy(device_configuration.version, "10", sizeof(device_configuration.version));
+    //Default values are populated above 
+    uint8_t* device_config_ptr = (uint8_t*) &device_configuration; 
+    if (flash_fs_write_file_to_fs("/lfs/device_config", device_config_ptr, sizeof(device_configuration)))
+    {
+        LOG_DBG("Unable to write to file"); 
+    }
+    else 
+    {
+        LOG_DBG("Created and wrote default values to file"); 
+    }
+
+    device_configuration.device_id = 0;
     ZERO_ARRAY(device_configuration.last_etag);
     ZERO_ARRAY(device_configuration.api_secret);
     ZERO_ARRAY(device_configuration.version);
+    #endif 
 
-    if (flash_fs_is_file_exist("device_config"))
+    if (flash_fs_is_file_exist("/lfs/device_config"))
     {
         // Fetch the values
         uint8_t * device_config_ptr = (uint8_t *) &device_configuration;
-        int err = flash_fs_read_file_to_fs("device_config", device_config_ptr, sizeof(device_configuration));
+        int err = flash_fs_read_file_to_fs("/lfs/device_config", device_config_ptr, sizeof(device_configuration));
         if (err != 0)
         {
-            LOG_ERR("Failed to read device config from file.");
+            LOG_DBG("Failed to read device config from file.");
+        }
+        else 
+        {
+            LOG_DBG("Read config from the file"); 
+            //DEBUG: print the device configuration 
+            LOG_DBG("Read Dev ID: %d", device_configuration.device_id); 
+            LOG_DBG("Read Last ETAG: %s", device_configuration.last_etag);
+            LOG_DBG("Read API Secret: %s", device_configuration.api_secret);
+            LOG_DBG("Read Version: %s", device_configuration.version);
+        }
+    }
+    else 
+    {
+        LOG_DBG("Device Config doesnt exist, creating file"); 
+        if (flash_fs_file_create("/lfs/device_config"))
+        {
+            LOG_DBG("Failed to create device configuration file"); 
+            return; 
+        }
+        // Set default values in case the file does not exists
+        device_configuration.device_id = CONFIG_DEVICE_ID;
+        strncpy(device_configuration.last_etag, "1", sizeof(device_configuration.last_etag));
+        strncpy(device_configuration.api_secret, CONFIG_API_SECRET, sizeof(device_configuration.api_secret)); 
+        strncpy(device_configuration.version, "10", sizeof(device_configuration.version));
+        //Default values are populated above 
+        uint8_t* device_config_ptr = (uint8_t*) &device_configuration; 
+        if (flash_fs_write_file_to_fs("/lfs/device_config", device_config_ptr, sizeof(device_configuration)))
+        {
+            LOG_DBG("Unable to write to file"); 
+        }
+        else 
+        {
+            LOG_DBG("Created and wrote default values to file"); 
         }
     }
 }
