@@ -38,7 +38,6 @@ char * auth_build_canonical_string(const char* version, const char* device_id,
     end_of_string = strncat(end_of_string, " \n", 3); // Append whitespace + newline
     uint8_t timestamp_str[20u] = {0}; // Large enough to hold 64 bit int
     uint8_t count = snprintf(timestamp_str, sizeof(timestamp_str), "%llu \n", timestamp);
-    LOG_ERR("Wrote %d bytes to %s", count, timestamp_str); 
     end_of_string = strncat(end_of_string, timestamp_str, strlen(timestamp_str));
     //end_of_string = strncat(end_of_string, " \n", 3); // Append whitespace + newline
     end_of_string = strncat(end_of_string, method, strlen(method));
@@ -68,7 +67,7 @@ char * auth_hash_request_body(const char * body, size_t length)
         // Return hash of empty string
         body = "";
         length = 0;
-        return NULL;
+        //return NULL;
     }
     
     unsigned char hash_result[AUTH_SHA256_BUFFER_SIZE];  // SHA-256 = 32 bytes
@@ -138,6 +137,27 @@ char * auth_generate_hmac(const char * canonical_string, const char * secret)
     ZERO_ARRAY(hmac_result);
     int err = 0;
 
+    //Comparing 2 funcs 
+    err = mbedtls_md_hmac(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), (const unsigned char*)secret, strlen(secret), (const unsigned char*)canonical_string, strlen(canonical_string), hmac_result);
+    if (err)
+    {
+        LOG_ERR("Setup Fail: %d", err); 
+    }
+
+    printf("HMAC result raw: %s, len %d \n", hmac_result, strlen(hmac_result)); 
+    printf("HMAC Hex Result: "); 
+    for (int i = 0; i < strlen(hmac_result); i++)
+    {
+        printf("%02x", (unsigned char)hmac_result[i]); 
+    }
+    printf("\n"); 
+    printf("Encode: %s \n", auth_encode_base64(hmac_result, sizeof(hmac_result)));
+
+
+    #ifdef FULL
+    ZERO_ARRAY(hmac_result);
+
+
     #ifndef ORIGINAL
     //Allocate memory to ctx 
     struct mbedtls_md_context_t* ctx = (struct mbedtls_md_context_t*)malloc(sizeof(struct mbedtls_md_context_t)); 
@@ -147,18 +167,11 @@ char * auth_generate_hmac(const char * canonical_string, const char * secret)
     }
     //Get info 
     const mbedtls_md_info_t* info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
-    if(info == NULL) 
-    {
-        LOG_ERR("Couldnt find info for SHA256"); 
-    }
-    else 
-    {
-        LOG_ERR("Info Size: %d, Info Name: %s", mbedtls_md_get_size(info), mbedtls_md_get_name(info)); 
-    }
+
     //Init the context. Just does a memset()
     mbedtls_md_init(ctx);
     //Setup ctx with info and using hmac 
-    err = mbedtls_md_setup(ctx, info, 0); //No hmac?
+    err = mbedtls_md_setup(ctx, info, 1); 
     if(err) 
     {
         LOG_ERR("Setup Fail: %d", err);
@@ -227,10 +240,11 @@ char * auth_generate_hmac(const char * canonical_string, const char * secret)
     
     mbedtls_md_free(&ctx);
     #endif 
+    #endif 
 
     //Can just call mbedtls_md_hmac which does all the above?
 
-    LOG_ERR("HMAC result: %s, len %d", hmac_result, strlen(hmac_result)); 
+    //LOG_ERR("HMAC result: %s, len %d", hmac_result, strlen(hmac_result)); 
 
     // Return Base64-encoded signature
     return auth_encode_base64(hmac_result, sizeof(hmac_result));

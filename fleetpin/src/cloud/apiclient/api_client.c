@@ -62,8 +62,8 @@ static bool is_current_time_valid(int64_t * current_timestamp)
         return false;
     }
 
-    LOG_DBG("Date/time: %" PRIi64, current_time);
-    *current_timestamp = current_time;
+    LOG_DBG("Date/time: %" PRIi64 "millis, %" PRIi64 "s", current_time, (current_time / 10u));
+    *current_timestamp = (current_time / 1000u);
     return true;
 }
 
@@ -108,6 +108,10 @@ api_client_result_t api_client_request_udpate(const char * target_url_endpoint,
     {
         LOG_ERR("Failed to build canonical string. Aborting http request.");
         return result;
+    }
+    else 
+    {
+        printf("Canonical String: %s\n", canonical); 
     }
     // Generate signature
     char * hmac_signature = auth_generate_hmac(canonical, config->api_secret);

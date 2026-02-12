@@ -173,7 +173,7 @@ static int socket_setup(void)
     } 
 
     /* Connect */
-    err = connect(fd, res->ai_addr, sizeof(struct sockaddr_in));
+    err = connect(fd, res->ai_addr, sizeof(struct sockaddr));
     if (err < 0)
     {
         err = -errno;
