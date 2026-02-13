@@ -33,17 +33,17 @@ char * auth_build_canonical_string(const char* version, const char* device_id,
     // This is a horrible assumption, but the assumption is that all these pointers will fit in the target buffer.
     // Append each component followed by newline
     char * end_of_string = strncat(canonical_string, version, strlen(version));    
-    end_of_string = strncat(end_of_string, " \n", 3); // Append whitespace + newline
+    end_of_string = strncat(end_of_string, "\n", 3); // Append whitespace + newline
     end_of_string = strncat(end_of_string, device_id, strlen(device_id));
-    end_of_string = strncat(end_of_string, " \n", 3); // Append whitespace + newline
+    end_of_string = strncat(end_of_string, "\n", 3); // Append whitespace + newline
     uint8_t timestamp_str[20u] = {0}; // Large enough to hold 64 bit int
-    uint8_t count = snprintf(timestamp_str, sizeof(timestamp_str), "%llu \n", timestamp);
+    uint8_t count = snprintf(timestamp_str, sizeof(timestamp_str), "%llu\n", timestamp);
     end_of_string = strncat(end_of_string, timestamp_str, strlen(timestamp_str));
     //end_of_string = strncat(end_of_string, " \n", 3); // Append whitespace + newline
     end_of_string = strncat(end_of_string, method, strlen(method));
-    end_of_string = strncat(end_of_string, " \n", 3); // Append whitespace + newline
+    end_of_string = strncat(end_of_string, "\n", 3); // Append whitespace + newline
     end_of_string = strncat(end_of_string, path, strlen(path));
-    end_of_string = strncat(end_of_string, " \n", 3); // Append whitespace + newline
+    end_of_string = strncat(end_of_string, "\n", 3); // Append whitespace + newline
 
     //version, device_id, timestamp, method, path);
     if ((body_hash != NULL) && strlen(body_hash) > 0)
@@ -55,7 +55,7 @@ char * auth_build_canonical_string(const char* version, const char* device_id,
             LOG_ERR("Failed to append body hash to canonical string.");
             return NULL; // Error building string
         }
-        (void) strncat(end_of_string, " \n", 3); // Append whitespace + newline after body hash
+        (void) strncat(end_of_string, "\n", 3); // Append whitespace + newline after body hash
     }
     return canonical_string;
 }
@@ -144,7 +144,7 @@ char * auth_generate_hmac(const char * canonical_string, const char * secret)
         LOG_ERR("Setup Fail: %d", err); 
     }
 
-    printf("HMAC result raw: %s, len %d \n", hmac_result, strlen(hmac_result)); 
+    //printf("HMAC result raw: %s, len %d \n", hmac_result, strlen(hmac_result)); 
     printf("HMAC Hex Result: "); 
     for (int i = 0; i < strlen(hmac_result); i++)
     {

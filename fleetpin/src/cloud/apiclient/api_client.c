@@ -40,14 +40,14 @@ static const char * user_agent_field_value = "Fleetpin EPD Client/1.0";
 static const char * auth_version = "v1";
 static const char * http_headers[hdr_max_len][MAX_HEADER_FIELD_LEN] = 
 {
-    [hdr_auth_version]      = {"X-Auth-Version: "}, 
-    [hdr_device_id]         = {"X-Device-ID: "}, 
-    [hdr_timestamp]         = {"X-Timestamp: "}, 
-    [hdr_signature]         = {"X-Signature: "}, 
-    [hdr_user_agent]        = {"User-Agent: "}, 
-    [hdr_none_match]        = {"If-None-Match: "},
-    [hdr_config_version]    = {"X-Config-Version: "},
-    [hdr_firmware_build]    = {"X-Firmware-Build: "},
+    [hdr_auth_version]      = {"X-auth-version: "}, 
+    [hdr_device_id]         = {"X-device-id: "}, 
+    [hdr_timestamp]         = {"X-timestamp: "}, 
+    [hdr_signature]         = {"X-signature: "}, 
+    [hdr_user_agent]        = {"User-agent: "}, 
+    [hdr_none_match]        = {"If-none-match: "},
+    [hdr_config_version]    = {"X-config-version: "},
+    [hdr_firmware_build]    = {"X-firmware-build: "},
 };
 
 static bool is_current_time_valid(int64_t * current_timestamp)
@@ -111,7 +111,7 @@ api_client_result_t api_client_request_udpate(const char * target_url_endpoint,
     }
     else 
     {
-        printf("Canonical String: %s\n", canonical); 
+        printf("Canonical String (length %d): \n %s  \n", strlen(canonical), canonical); 
     }
     // Generate signature
     char * hmac_signature = auth_generate_hmac(canonical, config->api_secret);
@@ -146,7 +146,7 @@ api_client_result_t api_client_request_udpate(const char * target_url_endpoint,
     /* Don't keep connection open.. */
     strcat(http_header_info, "Connection: close\r\n");
 
-    LOG_DBG("HTTP Header: %s", http_header_info); 
+    LOG_DBG("HTTP Header: \r\n%s", http_header_info); 
 
     // Create the socket then send HTTP GET
     char * http_headers_ptr = http_header_info;

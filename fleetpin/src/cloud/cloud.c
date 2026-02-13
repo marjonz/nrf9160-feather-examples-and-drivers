@@ -28,6 +28,8 @@ static const char cert[] = {
 const int32_t timeout = 5 * MSEC_PER_SEC;
 #define SOCKET_TIMEOUT_SEC  8
 
+#define PORT_STRING "3000"
+
 /* Setup TLS options on a given socket */
 int tls_setup(int fd)
 {
@@ -92,6 +94,15 @@ int tls_setup(int fd)
     return 0;
 }
 
+void dump_addrinfo(const struct addrinfo *ai)
+{
+	printf("addrinfo @%p: ai_family=%d, ai_socktype=%d, ai_protocol=%d, "
+	       "sa_family=%d, sin_port=%x\n",
+	       ai, ai->ai_family, ai->ai_socktype, ai->ai_protocol,
+	       ai->ai_addr->sa_family,
+	       ((struct sockaddr_in *)ai->ai_addr)->sin_port);
+}
+
 static int socket_setup(void)
 {
     int fd = -1;
@@ -106,7 +117,7 @@ static int socket_setup(void)
     };
 
     LOG_INF("Looking up %s", CONFIG_CLOUD_HOSTNAME);
-    err = getaddrinfo(CONFIG_CLOUD_HOSTNAME, NULL, &hints, &res);
+    err = getaddrinfo(CONFIG_CLOUD_HOSTNAME, PORT_STRING, &hints, &res);
     if (err)
     {
         LOG_ERR("getaddrinfo() failed. Err: %i", errno);
@@ -114,9 +125,12 @@ static int socket_setup(void)
     }
     else
     {
-        LOG_INF("getaddrinfo() successful.");
+        LOG_INF("getaddrinfo() successful."); 
+        dump_addrinfo(res);
+        LOG_INF("Addr Len: %" PRIu32 "", res->ai_addrlen);
     }
 
+    //Have a feeling something here isnt right
     ((struct sockaddr_in *)res->ai_addr)->sin_port = htons(CONFIG_CLOUD_PORT);
 
     /* Create it */
@@ -161,6 +175,7 @@ static int socket_setup(void)
     } 
 
     /* Setup TLS socket options */
+    /*
     err = tls_setup(fd);
     if (err < 0)
     {
@@ -171,9 +186,11 @@ static int socket_setup(void)
     {
         LOG_INF("TLS setup complete.");
     } 
+    */
 
     /* Connect */
-    err = connect(fd, res->ai_addr, sizeof(struct sockaddr));
+    //err = connect(fd, res->ai_addr, sizeof(struct sockaddr_in));
+    err = connect(fd, res->ai_addr, res->ai_addrlen);
     if (err < 0)
     {
         err = -errno;
