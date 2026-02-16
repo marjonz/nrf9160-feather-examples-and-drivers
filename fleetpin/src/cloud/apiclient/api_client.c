@@ -17,10 +17,9 @@
 LOG_MODULE_REGISTER(api_client, LOG_LEVEL_DBG);
 
 #define MAX_DEVICE_CONFIG_STRING_LEN    (10u) // Number of characters in UINT32_MAX
-#define MAX_HEADER_FIELD_LEN            (20U)
+#define MAX_HEADER_FIELD_LEN            (256u)//(20U)
 #define UNIX_MS_JAN_1_2021              (1609459200)
 #define MAX_HTTP_HEADER_INFO_LENGTH     (1024U)
-static char http_header_info[MAX_HTTP_HEADER_INFO_LENGTH] = {0};
 
 enum 
 {
@@ -32,6 +31,8 @@ enum
     hdr_none_match,
     hdr_config_version,
     hdr_firmware_build,
+    hdr_connection, 
+    hdr_NULL, 
     hdr_max_len // MUST BE LAST
 } header_index;
 
@@ -48,7 +49,12 @@ static const char * http_headers[hdr_max_len][MAX_HEADER_FIELD_LEN] =
     [hdr_none_match]        = {"If-none-match: "},
     [hdr_config_version]    = {"X-config-version: "},
     [hdr_firmware_build]    = {"X-firmware-build: "},
+    [hdr_connection]        = {"Connection: "},
 };
+
+static char http_header_info[hdr_max_len][MAX_HEADER_FIELD_LEN] = {0};
+
+static char *http_header_req[hdr_max_len] = {0}; 
 
 static bool is_current_time_valid(int64_t * current_timestamp)
 {
@@ -96,6 +102,7 @@ api_client_result_t api_client_request_udpate(const char * target_url_endpoint,
     ZERO_ARRAY(device_id_string);
     snprintf(device_id_string, sizeof(device_id_string),"%" PRIu32, config->device_id);
     ARG_UNUSED(device_id_string);
+
     char * canonical = auth_build_canonical_string(
         "v1",
         device_id_string,
@@ -111,50 +118,69 @@ api_client_result_t api_client_request_udpate(const char * target_url_endpoint,
     }
     else 
     {
-        printf("Canonical String (length %d): \n %s  \n", strlen(canonical), canonical); 
+        printf("Canonical String (length %d): \n%s  \n", strlen(canonical), canonical); 
     }
     // Generate signature
     char * hmac_signature = auth_generate_hmac(canonical, config->api_secret);
     printf("HMAC Signature: %s\n", hmac_signature);
 
-    // HTTP GET from target_url_endpoint, build header info first
-    // Build HTTP request headers, this will be appended to the http request structure.
-    ZERO_ARRAY(http_header_info);
-    snprintf(http_header_info, sizeof(http_header_info), "%s%s\r\n", *http_headers[hdr_auth_version], auth_version);
-    char temp_buffer[100u];
+    //Temp buffer to create strings from ints
+    char temp_buffer[256u];
     ZERO_ARRAY(temp_buffer);
-    snprintf(temp_buffer, sizeof(temp_buffer), "%s%" PRIu32 "\r\n", *http_headers[hdr_device_id], config->device_id);
-    strcat(http_header_info, temp_buffer);
-    ZERO_ARRAY(temp_buffer);
-    snprintf(temp_buffer, sizeof(temp_buffer), "%s%" PRIi64 "\r\n", *http_headers[hdr_timestamp], current_time);
-    strcat(http_header_info, temp_buffer);
-    ZERO_ARRAY(temp_buffer);
-    snprintf(temp_buffer, sizeof(temp_buffer), "%s%s\r\n", *http_headers[hdr_signature], hmac_signature);
-    strcat(http_header_info, temp_buffer);
-    ZERO_ARRAY(temp_buffer);
-    snprintf(temp_buffer, sizeof(temp_buffer), "%s%s\r\n", *http_headers[hdr_user_agent], user_agent_field_value);
-    strcat(http_header_info, temp_buffer);
-    ZERO_ARRAY(temp_buffer);
-    snprintf(temp_buffer, sizeof(temp_buffer), "%s\"%s\"\r\n", *http_headers[hdr_none_match], config->last_etag);
-    strcat(http_header_info, temp_buffer);
-    ZERO_ARRAY(temp_buffer);
-    snprintf(temp_buffer, sizeof(temp_buffer), "%s%s\r\n", *http_headers[hdr_config_version], config->version);
-    strcat(http_header_info, temp_buffer);
-    ZERO_ARRAY(temp_buffer);
-    snprintf(temp_buffer, sizeof(temp_buffer), "%s%s\r\n", *http_headers[hdr_firmware_build], VERSION);
-    strcat(http_header_info, temp_buffer);
-    /* Don't keep connection open.. */
-    strcat(http_header_info, "Connection: close\r\n");
 
-    LOG_DBG("HTTP Header: \r\n%s", http_header_info); 
+    //Loop through to init the header info
+    for (int i = 0; i < (hdr_max_len - 1); i++) 
+    {
+        snprintf(http_header_info[i], sizeof(http_header_info[i]), http_headers[i][0]); 
+    }
+
+    //Method - http header info array is "static", we form each string for the header then assign a pointer to the beginning of each string
+    strncat(&(http_header_info[hdr_auth_version][0]), auth_version, sizeof(http_header_info[hdr_auth_version]) - strlen(auth_version) - 1); 
+    
+    snprintf(temp_buffer, sizeof(temp_buffer), "%" PRIu32 "", config->device_id);
+    strncat(&(http_header_info[hdr_device_id][0]), temp_buffer, sizeof(http_header_info[hdr_device_id]) - strlen(temp_buffer) - 1); 
+    ZERO_ARRAY(temp_buffer);
+
+    snprintf(temp_buffer, sizeof(temp_buffer), "%" PRIi64 "", current_time);
+    strncat(&(http_header_info[hdr_timestamp][0]), temp_buffer, sizeof(http_header_info[hdr_timestamp]) - strlen(temp_buffer) - 1); 
+    ZERO_ARRAY(temp_buffer); 
+
+    strncat(&(http_header_info[hdr_signature][0]), hmac_signature, sizeof(http_header_info[hdr_signature]) - strlen(hmac_signature) - 1); 
+
+    strncat(&(http_header_info[hdr_user_agent][0]), user_agent_field_value, sizeof(http_header_info[hdr_user_agent]) - strlen(user_agent_field_value) - 1);
+
+    strncat(&(http_header_info[hdr_none_match][0]), config->last_etag, sizeof(http_header_info[hdr_none_match]) - strlen(config->last_etag) - 1);
+
+    strncat(&(http_header_info[hdr_config_version][0]), config->version, sizeof(http_header_info[hdr_config_version]) - strlen(config->version) - 1);
+
+    strncat(&(http_header_info[hdr_firmware_build][0]), VERSION, sizeof(http_header_info[hdr_firmware_build]) - strlen(VERSION) - 1);
+
+    strncat(&(http_header_info[hdr_connection][0]), "close", sizeof(http_header_info[hdr_connection]) - strlen("close") - 1);
+
+    //Add \r\n to each string 
+    for (int i = 0; i < (hdr_max_len - 1); i++) 
+    {
+        strncat(&(http_header_info[i][0]), "\r\n", sizeof(http_header_info[i]) - strlen("\r\n") - 1);
+    }
+    
+
+    for (int i = 0; i < (hdr_max_len - 1); i++) 
+    {
+        http_header_req[i] = http_header_info[i]; 
+        printf("HTTP Headers[%d]: %s", i, http_header_req[i]); 
+    }
+
+    //Needs to be a NULL terminated list for the http req 
+    http_header_req[hdr_NULL] = NULL; 
 
     // Create the socket then send HTTP GET
-    char * http_headers_ptr = http_header_info;
-    char * http_headers_dbl_ptr = http_headers_ptr;
-    int err = cloud_get_from_endpoint(target_url_endpoint, http_headers_dbl_ptr, response_handler,
+    int err = cloud_get_from_endpoint(target_url_endpoint, http_header_req, response_handler,
                 reponse_data_buffer, reponse_data_buffer_len);
     ARG_UNUSED(err);
     result.status_code = err;
+
+    //Zero the info array for sending next time
+    memset(http_header_info, 0, sizeof(http_header_info));
     return result;
 }
 
@@ -178,7 +204,10 @@ api_client_result_t api_client_fetch_config(const char * target_url_endpoint,
 
     // Hash request body (empty for GET)
     char * body_hash = auth_hash_request_body(NULL, 0);
-    LOG_DBG("[APIClient] Body hash (empty): %s\n", body_hash);
+    if (body_hash != NULL )
+    {
+        LOG_DBG("[APIClient] Body hash (empty): %s, len %d\n", body_hash, strlen(body_hash));
+    }
 
     //Debug: check api secret has been written 
     LOG_DBG("API Secret: %s", config->api_secret); 
@@ -188,6 +217,7 @@ api_client_result_t api_client_fetch_config(const char * target_url_endpoint,
     ZERO_ARRAY(device_id_string);
     snprintf(device_id_string, sizeof(device_id_string),"%" PRIu32, config->device_id);
     ARG_UNUSED(device_id_string);
+
     char * canonical = auth_build_canonical_string(
         "v1",
         device_id_string,
@@ -201,37 +231,61 @@ api_client_result_t api_client_fetch_config(const char * target_url_endpoint,
         LOG_ERR("Failed to build canonical string. Aborting http request.");
         return result;
     }
+    else 
+    {
+        printf("Canonical String (length %d): \n%s  \n", strlen(canonical), canonical); 
+    }
+
     // Generate signature
     char * hmac_signature = auth_generate_hmac(canonical, config->api_secret);
     printf("HMAC Signature: %s\n", hmac_signature);
 
-    // HTTP GET from target_url_endpoint, build header info first
-    // Build HTTP request headers, this will be appended to the http request structure.
-    ZERO_ARRAY(http_header_info);
-    snprintf(http_header_info, sizeof(http_header_info), "%s%s\r\n", *http_headers[hdr_auth_version], auth_version);
-    char temp_buffer[100u];
+    //Temp buffer to create strings from ints
+    char temp_buffer[256u];
     ZERO_ARRAY(temp_buffer);
-    snprintf(temp_buffer, sizeof(temp_buffer), "%s%" PRIu32 "\r\n", *http_headers[hdr_device_id], config->device_id);
-    strcat(http_header_info, temp_buffer);
-    ZERO_ARRAY(temp_buffer);
-    snprintf(temp_buffer, sizeof(temp_buffer), "%s%" PRIi64 "\r\n", *http_headers[hdr_timestamp], current_time);
-    strcat(http_header_info, temp_buffer);
-    ZERO_ARRAY(temp_buffer);
-    snprintf(temp_buffer, sizeof(temp_buffer), "%s%s\r\n", *http_headers[hdr_signature], hmac_signature);
-    strcat(http_header_info, temp_buffer);
-    ZERO_ARRAY(temp_buffer);
-    snprintf(temp_buffer, sizeof(temp_buffer), "%s%s\r\n", *http_headers[hdr_user_agent], user_agent_field_value);
-    strcat(http_header_info, temp_buffer);
-    ZERO_ARRAY(temp_buffer);
-    snprintf(temp_buffer, sizeof(temp_buffer), "%s%s\r\n", *http_headers[hdr_firmware_build], VERSION);
-    strcat(http_header_info, temp_buffer);
-    /* Don't keep connection open.. */
-    strcat(http_header_info, "Connection: close\r\n");
 
-    // Create the socket then send HTTP GET
-    char * http_headers_ptr = http_header_info;
-    char * http_headers_dbl_ptr = http_headers_ptr;
-    int err = cloud_get_from_endpoint(target_url_endpoint, http_headers_dbl_ptr, response_handler,
+    //Loop through to init the header info
+    for (int i = 0; i < (hdr_max_len - 1); i++) 
+    {
+        snprintf(http_header_info[i], sizeof(http_header_info[i]), http_headers[i][0]); 
+    }
+
+    //Method - http header info array is "static", we form each string for the header then assign a pointer to the beginning of each string
+    strncat(&(http_header_info[hdr_auth_version][0]), auth_version, sizeof(http_header_info[hdr_auth_version]) - strlen(auth_version) - 1); 
+    
+    snprintf(temp_buffer, sizeof(temp_buffer), "%" PRIu32 "", config->device_id);
+    strncat(&(http_header_info[hdr_device_id][0]), temp_buffer, sizeof(http_header_info[hdr_device_id]) - strlen(temp_buffer) - 1); 
+    ZERO_ARRAY(temp_buffer);
+
+    snprintf(temp_buffer, sizeof(temp_buffer), "%" PRIi64 "", current_time);
+    strncat(&(http_header_info[hdr_timestamp][0]), temp_buffer, sizeof(http_header_info[hdr_timestamp]) - strlen(temp_buffer) - 1); 
+    ZERO_ARRAY(temp_buffer); 
+
+    strncat(&(http_header_info[hdr_signature][0]), hmac_signature, sizeof(http_header_info[hdr_signature]) - strlen(hmac_signature) - 1); 
+
+    strncat(&(http_header_info[hdr_user_agent][0]), user_agent_field_value, sizeof(http_header_info[hdr_user_agent]) - strlen(user_agent_field_value) - 1);
+
+    strncat(&(http_header_info[hdr_config_version][0]), config->version, sizeof(http_header_info[hdr_config_version]) - strlen(config->version) - 1);
+
+    strncat(&(http_header_info[hdr_connection][0]), "close", sizeof(http_header_info[hdr_connection]) - strlen("close") - 1);
+
+    //Add \r\n to each string 
+    for (int i = 0; i < (hdr_max_len - 1); i++) 
+    {
+        strncat(&(http_header_info[i][0]), "\r\n", sizeof(http_header_info[i]) - strlen("\r\n") - 1);
+    }
+    
+
+    for (int i = 0; i < (hdr_max_len - 1); i++) 
+    {
+        http_header_req[i] = http_header_info[i]; 
+        printf("HTTP Headers[%d]: %s", i, http_header_req[i]); 
+    }
+
+    //Needs to be a NULL terminated list for the http req 
+    http_header_req[hdr_NULL] = NULL; 
+
+    int err = cloud_get_from_endpoint(target_url_endpoint, http_header_req, response_handler,
                 reponse_data_buffer, reponse_data_buffer_len);
     ARG_UNUSED(err);
     result.status_code = err;

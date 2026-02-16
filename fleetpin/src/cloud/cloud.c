@@ -117,7 +117,8 @@ static int socket_setup(void)
     };
 
     LOG_INF("Looking up %s", CONFIG_CLOUD_HOSTNAME);
-    err = getaddrinfo(CONFIG_CLOUD_HOSTNAME, PORT_STRING, &hints, &res);
+    //err = getaddrinfo(CONFIG_CLOUD_HOSTNAME, PORT_STRING, &hints, &res);
+    err = getaddrinfo(CONFIG_CLOUD_HOSTNAME, NULL, &hints, &res);
     if (err)
     {
         LOG_ERR("getaddrinfo() failed. Err: %i", errno);
@@ -134,7 +135,7 @@ static int socket_setup(void)
     ((struct sockaddr_in *)res->ai_addr)->sin_port = htons(CONFIG_CLOUD_PORT);
 
     /* Create it */
-    fd = socket(res->ai_family, SOCK_STREAM, IPPROTO_TLS_1_2);
+    fd = socket(res->ai_family, SOCK_STREAM, IPPROTO_TCP);
     if (fd == -1)
     {
         LOG_ERR("Failed to open socket!");
@@ -222,11 +223,11 @@ clean_up:
         return fd;
 }
 
-int cloud_get_from_endpoint(const char * url_endpoint, const char * http_headers,
+int cloud_get_from_endpoint(const char * url_endpoint, const char ** http_headers,
     http_response_cb_t callback_fn, 
     uint8_t * reponse_data_buffer, size_t reponse_data_buffer_len)
 {
-        int fd = -1;
+    int fd = -1;
     int ret = 0;
 
     LOG_INF("Publish path: %s%s", CONFIG_CLOUD_HOSTNAME, url_endpoint);
@@ -244,6 +245,7 @@ int cloud_get_from_endpoint(const char * url_endpoint, const char * http_headers
     /* POST */
     struct http_request req;
     memset(&req, 0, sizeof(req));
+
     req.method = HTTP_GET;
     req.url = url_endpoint;
     req.host = CONFIG_CLOUD_HOSTNAME;
@@ -254,7 +256,10 @@ int cloud_get_from_endpoint(const char * url_endpoint, const char * http_headers
     req.recv_buf = reponse_data_buffer;
     req.recv_buf_len = reponse_data_buffer_len;
     req.content_type_value = "application/json";
-    req.header_fields = (const char **)&http_headers;
+    LOG_INF("Everything but http headers");
+    req.header_fields = http_headers;
+
+    LOG_INF("Created HTTP Request"); 
 
     const int32_t get_timeout_ms = 30000; // As per fleetpin implementation, 30 second timeout.
     ret = http_client_req(fd, &req, get_timeout_ms, NULL);

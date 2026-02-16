@@ -368,18 +368,50 @@ static void response_callback(struct http_response *rsp,
     /* Check status */
     if (rsp->http_status_code != 200 && rsp->http_status_code != 201)
     {
+        LOG_INF("Bad Request, returning"); 
         return;
     }
 
+    if (final_data == HTTP_DATA_MORE) 
+    {
+        LOG_INF("Partial data received (%zd bytes)", rsp->data_len);
+        LOG_INF("Data Processed: %zd", rsp->processed);
+        LOG_INF("Max Data Len: %zd", rsp->recv_buf_len); 
+    }
     if (final_data == HTTP_DATA_FINAL)
     {
-        LOG_HEXDUMP_INF(rsp->recv_buf, rsp->recv_buf_len, "Response data");
+        LOG_INF("All the data received (%zd bytes)", rsp->data_len);
+        //Hexdump seems to cause stack overflow 
+        //LOG_HEXDUMP_INF(rsp->recv_buf, rsp->recv_buf_len, "Response data");
+
+        //Print out as much info as I can 
+        LOG_INF("Data Start Address: 0x%x", rsp->recv_buf); 
+        LOG_INF("Body Frag Start Address: 0x%x", rsp->body_frag_start); 
+        LOG_INF("Body Frag Length: %d", rsp->body_frag_len);
+        LOG_INF("Max Data Len: %zd", rsp->recv_buf_len); 
+        LOG_INF("Data Processed: %zd", rsp->processed);
+        LOG_INF("CL Present: %d Body Found: %d Message Complete: %d", rsp->cl_present, rsp->body_found, rsp->message_complete); 
 
         if (!rsp->body_found)
         {
-            LOG_ERR("Body not found");
+            LOG_INF("Body not found");
             return;
         }
+
+        printf("Header Dump\r\n"); 
+        for (int i = 0; i < (rsp->data_len - rsp->body_frag_len); i++) 
+        {
+            printf("%04x ", rsp->recv_buf[i]);  
+        }
+        printf("\r\n");
+
+        printf("Body Dump\r\n");
+        for (int i = 0; i < (rsp->body_frag_len); i++) 
+        { 
+            printf("%04x ", rsp->body_frag_start[i]); 
+
+        }
+        printf("\r\n"); 
 
         // FIXME: Process response
         ARG_UNUSED(user_data);
@@ -387,6 +419,7 @@ static void response_callback(struct http_response *rsp,
         // FIXME: Essentianlly, implement dump_of_request_update_response_handler_from_arduino() in here.
         //        I dumped the code above for reference from the customer's Arduino project.
 
+        /*
         // If we need to store the response, copy the response to DisplayImage
         char new_version[DEV_CFG_MAX_VERSION_LENGTH];
         ZERO_ARRAY(new_version);
@@ -434,6 +467,7 @@ static void response_callback(struct http_response *rsp,
         //          The other question is, also, do I need to have a separate buffer for the HTTP response and then copy to DisplayImage here?
         //push_http_bmp_into_epaper_buffer(<response buffer>, DisplayImage);
         store_epaper_buffer_to_file(device_cfg_ptr->version, DisplayImage);
+        */
     }
 }
 

@@ -14,7 +14,7 @@
  * @param callback_fn - callback function to execute on response from endpoint.
  * @return int 0 if successful, see errno for error information.
  */
-int cloud_get_from_endpoint(const char * url_endpoint, const char * http_headers,
+int cloud_get_from_endpoint(const char * url_endpoint, const char ** http_headers,
     http_response_cb_t callback_fn, 
     uint8_t * reponse_data_buffer, size_t reponse_data_buffer_len);
 
