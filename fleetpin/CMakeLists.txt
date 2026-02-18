@@ -13,6 +13,8 @@ target_sources(app PRIVATE src/cloud/cloud.c)
 target_sources(app PRIVATE src/cloud/apiclient/api_client.c)
 # Authentication
 target_sources(app PRIVATE src/cloud/authentication/auth.c)
+# Decompression
+target_sources(app PRIVATE src/cloud/miniz/miniz.c)
 
 # Waveshare epaper files
 target_sources(app PRIVATE src/epaper/epaper_driver.c)

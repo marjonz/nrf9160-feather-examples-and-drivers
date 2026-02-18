@@ -30,7 +30,14 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 
 #include <inttypes.h>
 #include <stdint.h>
+
+//Header Parsing 
 #include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+#include <stdlib.h>
+
+#include "cloud/miniz/miniz.h" 
 
 #ifndef CONFIG_APN_DEFAULT_VALUE
 #   define CONFIG_APN_DEFAULT_VALUE "onemondo"
@@ -45,6 +52,7 @@ K_TIMER_DEFINE(timer, timeout_handler, NULL);
 /* Thread control */
 K_SEM_DEFINE(thread_sem, 0, 1);
 K_SEM_DEFINE(lte_connected, 0, 1);
+K_SEM_DEFINE(new_display, 0, 1);
 
 /* Variables */
 // Declare a static image buffer for the ePaper display
@@ -52,6 +60,10 @@ K_SEM_DEFINE(lte_connected, 0, 1);
 #define MAX_WIDTH   800u
 #define MAX_HEIGHT  480u
 #define MAX_IMAGE_SIZE ((MAX_WIDTH/8u) * MAX_HEIGHT)
+
+//Also need a receive buffer for the compressed data received from the http request 
+static uint8_t http_receive_buf[MAX_IMAGE_SIZE] = {0}; 
+
 //Create a new image cache
 static uint8_t DisplayImage[MAX_IMAGE_SIZE] = {0};
 static size_t current_display_image_index = 0u;
@@ -126,6 +138,10 @@ static void on_modem_lib_init(int ret, void *ctx)
 }
 #endif
 
+/**
+ * The received http data, pushing the data into the display image buffer. Already do this in the 
+ * http response callback when we uncompress the data. 
+*/
 static void push_http_bmp_into_epaper_buffer(bool is_first_chunk_of_data, 
     const uint8_t * const http_bmp_data, size_t http_data_len)
 {
@@ -359,6 +375,42 @@ static bool is_strings_same(char * str1, const char * str2, size_t max_len)
     return false;
 }
 
+int get_header_value(const char *response_start,
+                     const char *body_start,
+                     const char *field_name,
+                     char *out,
+                     size_t out_size)
+{
+    size_t header_len = (size_t)(body_start - response_start);
+    size_t field_len  = strlen(field_name);
+
+    const char *p   = response_start;
+    const char *end = response_start + header_len;
+
+    while (p < end) {
+        const char *eol = strstr(p, "\r\n");
+        if (!eol || eol > end) break;
+
+        /* Check if this line starts with "FieldName: " */
+        if ((size_t)(eol - p) > field_len + 2 &&
+            strncmp(p, field_name, field_len) == 0 &&
+            p[field_len] == ':' && p[field_len + 1] == ' ')
+        {
+            const char *val     = p + field_len + 2;
+            size_t      val_len = (size_t)(eol - val);
+
+            if (val_len >= out_size) val_len = out_size - 1;
+            memcpy(out, val, val_len);
+            out[val_len] = '\0';
+            return 0;
+        }
+
+        p = eol + 2;
+    }
+
+    return -1;  /* not found */
+}
+
 static void response_callback(struct http_response *rsp,
 				   enum http_final_call final_data,
 				   void *user_data)
@@ -380,6 +432,7 @@ static void response_callback(struct http_response *rsp,
     }
     if (final_data == HTTP_DATA_FINAL)
     {
+        #ifdef DEBUG_HTTP_RESPONSE
         LOG_INF("All the data received (%zd bytes)", rsp->data_len);
         //Hexdump seems to cause stack overflow 
         //LOG_HEXDUMP_INF(rsp->recv_buf, rsp->recv_buf_len, "Response data");
@@ -392,67 +445,99 @@ static void response_callback(struct http_response *rsp,
         LOG_INF("Data Processed: %zd", rsp->processed);
         LOG_INF("CL Present: %d Body Found: %d Message Complete: %d", rsp->cl_present, rsp->body_found, rsp->message_complete); 
 
-        if (!rsp->body_found)
-        {
-            LOG_INF("Body not found");
-            return;
-        }
-
         printf("Header Dump\r\n"); 
         for (int i = 0; i < (rsp->data_len - rsp->body_frag_len); i++) 
         {
-            printf("%04x ", rsp->recv_buf[i]);  
+            printf("%02x ", rsp->recv_buf[i]);  
         }
         printf("\r\n");
 
         printf("Body Dump\r\n");
         for (int i = 0; i < (rsp->body_frag_len); i++) 
         { 
-            printf("%04x ", rsp->body_frag_start[i]); 
+            printf("%02x ", rsp->body_frag_start[i]); 
 
         }
         printf("\r\n"); 
+        #endif 
+
+        /*
+        //Extract ETag and Version. On the stack for now but need to change and put in main
+        device_cfg_t http_dev_cfg = {0}; 
+        //Copy existing values into this so we dont overwrite legit values in other fields
+        memcpy(&http_dev_cfg, device_cfg_ptr, sizeof(device_cfg_t)); 
+        char etag[DEV_CFG_MAX_ETAG_LENGTH]; 
+        char version[DEV_CFG_MAX_VERSION_LENGTH]; 
+        bool update = false; 
+
+        if (get_header_value(rsp->recv_buf, rsp->body_frag_start, "ETag", etag, sizeof(etag)) == 0)
+        {
+            printf("ETag: %s\n", etag); 
+            //Compare to existing etag val in the device cfg 
+            if (strcmp(etag, device_cfg_ptr->last_etag) != 0)
+            {
+                //Update the val
+                strcpy(http_dev_cfg.last_etag, etag); 
+                printf("New Etag: %s\r\n", http_dev_cfg.last_etag);
+                //Flag update? 
+                update = true; 
+            }
+        }
+
+        if (get_header_value(rsp->recv_buf, rsp->body_frag_start, "X-Config-Version", version, sizeof(version)) == 0)
+        {
+            printf("Version: %s\n", version); 
+            //Compare to existing etag val in the device cfg 
+            if (strcmp(version, device_cfg_ptr->version) != 0)
+            {
+                //Update the val
+                strcpy(http_dev_cfg.version, version); 
+                printf("New Version: %s\r\n", http_dev_cfg.version);
+                //Flag update? 
+                update = true; 
+            }
+        }
+
+        if (update) 
+        {
+            //Have to make a copy 
+            device_cfg_set(&http_dev_cfg); 
+        }
+        */
+
+        if (!rsp->body_found)
+        {
+            LOG_INF("Body not found");
+            return;
+        }
 
         // FIXME: Process response
         ARG_UNUSED(user_data);
 
-        // FIXME: Essentianlly, implement dump_of_request_update_response_handler_from_arduino() in here.
-        //        I dumped the code above for reference from the customer's Arduino project.
+        //Do the decompression, extract the http receive buffer to the display image 
+        mz_ulong uncompressed_len = MAX_IMAGE_SIZE;  
+        int ret_code = mz_uncompress(DisplayImage, &uncompressed_len, rsp->body_frag_start, rsp->body_frag_len); 
 
+        if (ret_code == Z_OK)
+        {
+            #ifdef DEBUG_HTTP_RESPONSE
+            LOG_INF("Uncompressed Data!"); 
+            LOG_INF("Dest Len: %zd", uncompressed_len); 
+            printf("Decompressed Data Dump\r\n");
+            for (int i = 0; i < MAX_IMAGE_SIZE; i++) 
+            { 
+                printf("%02x", DisplayImage[i]); 
+            }
+            printf("\r\n");
+            #endif 
+        }
+        else 
+        {
+            LOG_INF("Failed to decompress :( Err Code: %d", ret_code); 
+        }
+
+        
         /*
-        // If we need to store the response, copy the response to DisplayImage
-        char new_version[DEV_CFG_MAX_VERSION_LENGTH];
-        ZERO_ARRAY(new_version);
-        // FIXME: copy the response version string to new_version.
-        // You'll have to extract it from the key + value pair of the response body.
-        // This is currently wrong, but a placeholder
-        strncpy(new_version, (char *)rsp->body_frag_start, MIN(rsp->body_frag_len, sizeof(new_version) - 1u));
-        
-        // Set default value to "no update"
-        bool must_update_device_cfg = false;
-        if (is_strings_same(new_version, device_cfg_ptr->version, DEV_CFG_MAX_VERSION_LENGTH))
-        {
-            LOG_INF("New version detected: %s", new_version);
-            // Update the version in device configuration
-            update_with_new_string(device_cfg_ptr->version, new_version, strlen(new_version));
-            must_update_device_cfg = true;
-        }
-        // FIXME: Do the same for the etag field if needed.
-        // If we need to store the response, copy the response to DisplayImage
-        char new_etag[DEV_CFG_MAX_ETAG_LENGTH];
-        ZERO_ARRAY(new_etag);
-        // FIXME: copy the response etag string to new_etag.
-        // You'll have to extract it from the key + value pair of the response body.
-        // This is currently wrong, but a placeholder
-        strncpy(new_etag, (char *)rsp->body_frag_start, MIN(rsp->body_frag_len, sizeof(new_etag) - 1u));
-        if (is_strings_same(new_etag, device_cfg_ptr->last_etag, DEV_CFG_MAX_ETAG_LENGTH))
-        {
-            LOG_INF("New etag detected: %s", new_etag);
-            // Update the etag in device configuration
-            update_with_new_string(device_cfg_ptr->last_etag, new_etag, strlen(new_etag));
-            must_update_device_cfg = true;
-        }
-        
         // Store the updated device configuration to flash
         if (must_update_device_cfg)
         {
@@ -462,6 +547,7 @@ static void response_callback(struct http_response *rsp,
                 LOG_ERR("Failed to store updated device configuration. Err: %i", err);
             }
         }
+            
 
         // FIXME: Do I still need to push this, if the actual response is already in the DisplayImage buffer via the callback?
         //          The other question is, also, do I need to have a separate buffer for the HTTP response and then copy to DisplayImage here?
@@ -542,7 +628,10 @@ void cloud_thr(void *p1, void *p2, void *p3)
         // See cloud.c : const int32_t get_timeout_ms = 30000; // As per fleetpin implementation, 30 second timeout.
         // FIXME: Implement the configugration callback handler separately
         //api_client_fetch_config("configuration", device_cfg_ptr, dump_of_request_config_response_handler_from_arduino, DisplayImage, sizeof(DisplayImage));
-        api_client_request_udpate("/ruc/label.bmp", device_cfg_ptr, response_callback, DisplayImage, sizeof(DisplayImage));
+        api_client_request_udpate("/ruc/label.bmp", device_cfg_ptr, response_callback, http_receive_buf, sizeof(http_receive_buf));
+
+        k_sem_give(&new_display);
+        //Returned from the cloud functionality. Should have freed the display image 
         
         // Wait until the socket times out or a response is received.
         k_sem_take(&thread_sem, K_FOREVER);
@@ -581,6 +670,24 @@ void epaper_thr(void *p1, void *p2, void *p3)
 
     // ePAPER test display
     epaper_display_test();
+
+    while(1)
+    {
+        k_sem_take(&new_display, K_FOREVER);
+        LOG_INF("New Image!!!"); 
+        /*
+        printf("Decompressed Data Dump\r\n");
+        for (int i = 0; i < MAX_IMAGE_SIZE; i++) 
+        { 
+            printf("%02x", DisplayImage[i]); 
+        }
+        printf("\r\n");
+        */
+        epaper_draw_current_image_buffer(DisplayImage); 
+        //Set display image to zeros to avoid re writing?? 
+
+    }
+
 }
 
 /* Thread entry function for the fourth thread */

@@ -15,30 +15,7 @@ void device_cfg_init(void)
     LOG_DBG("Init Dev ID: %d", device_configuration.device_id); 
     LOG_DBG("Init Last ETAG: %s", device_configuration.last_etag);
     LOG_DBG("Init API Secret: %s", device_configuration.api_secret);
-    LOG_DBG("Init Version: %s", device_configuration.version);
-
-    #ifdef INIT_WRITE
-    // Set default values in case the file does not exists
-    device_configuration.device_id = CONFIG_DEVICE_ID;
-    strncpy(device_configuration.last_etag, "1", sizeof(device_configuration.last_etag));
-    strncpy(device_configuration.api_secret, CONFIG_API_SECRET, sizeof(device_configuration.api_secret)); 
-    strncpy(device_configuration.version, "10", sizeof(device_configuration.version));
-    //Default values are populated above 
-    uint8_t* device_config_ptr = (uint8_t*) &device_configuration; 
-    if (flash_fs_write_file_to_fs("/lfs/device_config", device_config_ptr, sizeof(device_configuration)))
-    {
-        LOG_DBG("Unable to write to file"); 
-    }
-    else 
-    {
-        LOG_DBG("Created and wrote default values to file"); 
-    }
-
-    device_configuration.device_id = 0;
-    ZERO_ARRAY(device_configuration.last_etag);
-    ZERO_ARRAY(device_configuration.api_secret);
-    ZERO_ARRAY(device_configuration.version);
-    #endif 
+    LOG_DBG("Init Version: %s", device_configuration.version); 
 
     if (flash_fs_is_file_exist("/lfs/device_config"))
     {
@@ -92,9 +69,10 @@ device_cfg_t * device_cfg_get(void)
 
 int device_cfg_set(const device_cfg_t * new_value)
 {
-    device_configuration = *new_value;
+    memcpy(&device_configuration, new_value, sizeof(device_cfg_t)); 
+    //device_configuration = *new_value;
     const uint8_t * const device_config_ptr = (const uint8_t * const ) &device_configuration;
-    int result = flash_fs_write_file_to_fs("device_config", device_config_ptr, sizeof(device_configuration));
+    int result = flash_fs_write_file_to_fs("/lfs/device_config", device_config_ptr, sizeof(device_configuration));
     if (result != 0)
     {
         LOG_ERR("Failed to write device config to file.");

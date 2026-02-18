@@ -181,6 +181,8 @@ api_client_result_t api_client_request_udpate(const char * target_url_endpoint,
 
     //Zero the info array for sending next time
     memset(http_header_info, 0, sizeof(http_header_info));
+
+    printf("Return from cloud send"); 
     return result;
 }
 

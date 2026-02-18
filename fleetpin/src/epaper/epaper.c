@@ -81,9 +81,10 @@ void epaper_draw_current_image_buffer(uint8_t * const image_buffer)
     if (image_buffer != NULL)
     {
         LOG_DBG("Drawing bitmap image from buffer");
-        Paint_SelectImage(image_buffer);
-        Paint_SetScale(2);
-        Paint_Clear(WHITE);
+        //Paint_NewImage(image_buffer, EPD_4in26_WIDTH, EPD_4in26_HEIGHT, 0, WHITE);
+        //Paint_SelectImage(image_buffer);
+        //Paint_SetScale(2);
+        //Paint_Clear(WHITE);
         EPD_4in26_Display(image_buffer);        
     }
 }
