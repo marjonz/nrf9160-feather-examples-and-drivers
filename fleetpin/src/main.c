@@ -53,6 +53,7 @@ K_TIMER_DEFINE(timer, timeout_handler, NULL);
 K_SEM_DEFINE(thread_sem, 0, 1);
 K_SEM_DEFINE(lte_connected, 0, 1);
 K_SEM_DEFINE(new_display, 0, 1);
+K_SEM_DEFINE(new_device_cfg, 0, 1); 
 
 /* Variables */
 // Declare a static image buffer for the ePaper display
@@ -68,6 +69,7 @@ static uint8_t http_receive_buf[MAX_IMAGE_SIZE] = {0};
 static uint8_t DisplayImage[MAX_IMAGE_SIZE] = {0};
 static size_t current_display_image_index = 0u;
 static device_cfg_t * device_cfg_ptr = NULL;
+static device_cfg_t http_device_cfg = {0}; 
 
 static void timeout_handler(struct k_timer *timer_id)
 {
@@ -138,6 +140,7 @@ static void on_modem_lib_init(int ret, void *ctx)
 }
 #endif
 
+#if 0
 /**
  * The received http data, pushing the data into the display image buffer. Already do this in the 
  * http response callback when we uncompress the data. 
@@ -167,6 +170,7 @@ static void store_epaper_buffer_to_file(const char * filename, const uint8_t * c
         LOG_ERR("Failed to write epaper bitmap to file.");
     }
 }
+#endif 
 
 /* Define the stack sizes for the threads */
 #define STACK_SIZE                  1024
@@ -356,7 +360,6 @@ static void dump_of_request_config_response_handler_from_arduino(void)
     result.errorMessage = "HTTP " + String(code);
     }
 }
-#endif
 
 static void update_with_new_string(char * const target_string, char * const source_string, size_t max_len)
 {
@@ -374,6 +377,7 @@ static bool is_strings_same(char * str1, const char * str2, size_t max_len)
     }
     return false;
 }
+#endif 
 
 int get_header_value(const char *response_start,
                      const char *body_start,
@@ -461,24 +465,27 @@ static void response_callback(struct http_response *rsp,
         printf("\r\n"); 
         #endif 
 
-        /*
-        //Extract ETag and Version. On the stack for now but need to change and put in main
-        device_cfg_t http_dev_cfg = {0}; 
+        //Extract our header data
         //Copy existing values into this so we dont overwrite legit values in other fields
-        memcpy(&http_dev_cfg, device_cfg_ptr, sizeof(device_cfg_t)); 
+        memcpy(&http_device_cfg, device_cfg_ptr, sizeof(device_cfg_t)); 
+        printf("Existing Device Cfg:\r\n");
+        printf("ID: %d\r\n", http_device_cfg.device_id);
+        printf("ETAG: %s\r\n", http_device_cfg.last_etag);
+        printf("Version: %s\r\n", http_device_cfg.version);
+
         char etag[DEV_CFG_MAX_ETAG_LENGTH]; 
         char version[DEV_CFG_MAX_VERSION_LENGTH]; 
         bool update = false; 
 
         if (get_header_value(rsp->recv_buf, rsp->body_frag_start, "ETag", etag, sizeof(etag)) == 0)
         {
-            printf("ETag: %s\n", etag); 
+            //printf("ETag: %s\n", etag); 
             //Compare to existing etag val in the device cfg 
             if (strcmp(etag, device_cfg_ptr->last_etag) != 0)
             {
                 //Update the val
-                strcpy(http_dev_cfg.last_etag, etag); 
-                printf("New Etag: %s\r\n", http_dev_cfg.last_etag);
+                strcpy(http_device_cfg.last_etag, etag); 
+                printf("New Etag: %s\r\n", http_device_cfg.last_etag);
                 //Flag update? 
                 update = true; 
             }
@@ -486,13 +493,13 @@ static void response_callback(struct http_response *rsp,
 
         if (get_header_value(rsp->recv_buf, rsp->body_frag_start, "X-Config-Version", version, sizeof(version)) == 0)
         {
-            printf("Version: %s\n", version); 
+            //printf("Version: %s\n", version); 
             //Compare to existing etag val in the device cfg 
             if (strcmp(version, device_cfg_ptr->version) != 0)
             {
                 //Update the val
-                strcpy(http_dev_cfg.version, version); 
-                printf("New Version: %s\r\n", http_dev_cfg.version);
+                strcpy(http_device_cfg.version, version); 
+                printf("New Version: %s\r\n", http_device_cfg.version);
                 //Flag update? 
                 update = true; 
             }
@@ -500,10 +507,11 @@ static void response_callback(struct http_response *rsp,
 
         if (update) 
         {
+            //Deal with in the device cfg thread
+            k_sem_give(&new_device_cfg); 
             //Have to make a copy 
-            device_cfg_set(&http_dev_cfg); 
+            //device_cfg_set(&http_device_cfg); 
         }
-        */
 
         if (!rsp->body_found)
         {
@@ -701,6 +709,13 @@ void flash_fs_thr(void *p1, void *p2, void *p3)
 
     // Try and read the device configuration from the file system.
     device_cfg_init();
+
+    while(1)
+    {
+        k_sem_take(&new_device_cfg, K_FOREVER); 
+        LOG_DBG("New Device Config!!"); 
+        device_cfg_set(&http_device_cfg);
+    }
 }
 
 /* Define the threads using K_THREAD_DEFINE */

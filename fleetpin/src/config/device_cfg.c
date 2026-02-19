@@ -12,10 +12,12 @@ static device_cfg_t device_configuration = {0};
 void device_cfg_init(void)
 {
     //DEBUG:Print the init values to check
+    /*
     LOG_DBG("Init Dev ID: %d", device_configuration.device_id); 
     LOG_DBG("Init Last ETAG: %s", device_configuration.last_etag);
     LOG_DBG("Init API Secret: %s", device_configuration.api_secret);
     LOG_DBG("Init Version: %s", device_configuration.version); 
+    */
 
     if (flash_fs_is_file_exist("/lfs/device_config"))
     {
@@ -71,7 +73,13 @@ int device_cfg_set(const device_cfg_t * new_value)
 {
     memcpy(&device_configuration, new_value, sizeof(device_cfg_t)); 
     //device_configuration = *new_value;
-    const uint8_t * const device_config_ptr = (const uint8_t * const ) &device_configuration;
+    LOG_DBG("New Dev ID: %d", device_configuration.device_id); 
+    LOG_DBG("New Last ETAG: %s", device_configuration.last_etag);
+    LOG_DBG("New API Secret: %s", device_configuration.api_secret);
+    LOG_DBG("New Version: %s", device_configuration.version);
+
+    uint8_t* device_config_ptr = (uint8_t*) &device_configuration;
+
     int result = flash_fs_write_file_to_fs("/lfs/device_config", device_config_ptr, sizeof(device_configuration));
     if (result != 0)
     {
